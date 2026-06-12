@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generative Art Toy</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      cursor: crosshair;
+    }
+
+    #ui {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 10, 15, 0.82);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      z-index: 10;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 680px;
+      width: calc(100% - 48px);
+    }
+
+    .control {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 90px;
+    }
+
+    .control label {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+    }
+
+    .control .val {
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      text-align: right;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100px;
+      height: 3px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .divider {
+      width: 1px;
+      height: 36px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .btn {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.7);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+
+    .btn:hover { background: rgba(255,255,255,0.14); }
+
+    .mode-btns { display: flex; gap: 6px; }
+
+    .mode-btn {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.5);
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .mode-btn.active {
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+      border-color: rgba(255,255,255,0.3);
+    }
+
+    #hint {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 15px;
+      color: rgba(255,255,255,0.2);
+      pointer-events: none;
+      letter-spacing: 0.05em;
+      transition: opacity 0.5s;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <p id="hint">move your mouse to paint</p>
+
+  <div id="ui">
+    <div class="control">
+      <label>Hue</label>
+      <div class="control-row">
+        <input type="range" id="hue" min="0" max="360" value="200" step="1" />
+        <span class="val" id="hueVal">200</span>
+      </div>
+    </div>
+
+    <div class="control">
+      <label>Spread</label>
+      <div class="control-row">
+        <input type="range" id="speed" min="1" max="12" value="5" step="0.5" />
+        <span class="val" id="speedVal">5</span>
+      </div>
+    </div>
+
+    <div class="control">
+      <label>Decay</label>
+      <div class="control-row">
+        <input type="range" id="decay" min="1" max="40" value="18" step="1" />
+        <span class="val" id="decayVal">18</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="control" style="min-width:unset;">
+      <label>Mode</label>
+      <div class="mode-btns">
+        <button class="mode-btn active" data-mode="trails">trails</button>
+        <button class="mode-btn" data-mode="web">web</button>
+        <button class="mode-btn" data-mode="sparks">sparks</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="btn" id="clearBtn">clear</button>
+    <button class="btn" id="saveBtn">save ↓</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const hint = document.getElementById('hint');
+
+    let W, H;
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    let mouse = { x: W/2, y: H/2, px: W/2, py: H/2, down: false };
+    let particles = [];
+    let mode = 'trails';
+    let hue = 200, speed = 5, decay = 18;
+    let hinted = false;
+    let frameCount = 0;
+    let lastPoints = [];
+
+    function hideHint() {
+      if (!hinted) { hint.style.opacity = '0'; hinted = true; }
+    }
+
+    canvas.addEventListener('mousemove', e => {
+      mouse.px = mouse.x; mouse.py = mouse.y;
+      mouse.x = e.clientX; mouse.y = e.clientY;
+      hideHint();
+      spawnFromMouse();
+    });
+
+    canvas.addEventListener('mousedown', e => { mouse.down = true; mouse.x = e.clientX; mouse.y = e.clientY; });
+    canvas.addEventListener('mouseup', () => { mouse.down = false; });
+
+    canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const t = e.touches[0];
+      mouse.px = mouse.x; mouse.py = mouse.y;
+      mouse.x = t.clientX; mouse.y = t.clientY;
+      hideHint();
+      spawnFromMouse();
+    }, { passive: false });
+
+    function spawnFromMouse() {
+      const dx = mouse.x - mouse.px;
+      const dy = mouse.y - mouse.py;
+      const vel = Math.sqrt(dx*dx + dy*dy);
+      const count = mode === 'sparks' ? Math.ceil(vel * 0.6) + 2 : Math.ceil(vel * 0.3) + 1;
+
+      for (let i = 0; i < count; i++) {
+        if (mode === 'trails') spawnTrail(vel);
+        else if (mode === 'sparks') spawnSpark(vel);
+        else if (mode === 'web') {
+          lastPoints.push({ x: mouse.x, y: mouse.y });
+          if (lastPoints.length > 60) lastPoints.shift();
+        }
+      }
+    }
+
+    function spawnTrail(vel) {
+      const angle = Math.atan2(mouse.y - mouse.py, mouse.x - mouse.px);
+      const spread = (Math.random() - 0.5) * 0.8;
+      const s = (Math.random() * speed * 0.5 + 1);
+      particles.push({
+        x: mouse.x, y: mouse.y,
+        vx: Math.cos(angle + spread) * s,
+        vy: Math.sin(angle + spread) * s,
+        life: 1,
+        size: Math.random() * 3 + 1.5,
+        h: (hue + Math.random() * 40 - 20 + 360) % 360,
+        type: 'trail'
+      });
+    }
+
+    function spawnSpark(vel) {
+      const angle = Math.random() * Math.PI * 2;
+      const s = Math.random() * speed * 1.5 + 1;
+      particles.push({
+        x: mouse.x, y: mouse.y,
+        vx: Math.cos(angle) * s,
+        vy: Math.sin(angle) * s - 2,
+        life: 1,
+        size: Math.random() * 2 + 1,
+        h: (hue + Math.random() * 60 - 30 + 360) % 360,
+        type: 'spark'
+      });
+    }
+
+    function draw() {
+      frameCount++;
+
+      const fadeAlpha = 0.04 + (decay / 40) * 0.08;
+      ctx.fillStyle = `rgba(10,10,15,${fadeAlpha})`;
+      ctx.fillRect(0, 0, W, H);
+
+      if (mode === 'web') drawWeb();
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.05;
+        p.vx *= 0.98;
+        p.life -= 0.012 + (decay / 40) * 0.03;
+
+        if (p.life <= 0) { particles.splice(i, 1); continue; }
+
+        const alpha = p.life * p.life;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.h}, 90%, 70%, ${alpha})`;
+        ctx.fill();
+
+        if (p.type === 'trail' && p.life > 0.3) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * p.life * 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${p.h}, 90%, 70%, ${alpha * 0.12})`;
+          ctx.fill();
+        }
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    function drawWeb() {
+      if (lastPoints.length < 2) return;
+      for (let i = 0; i < lastPoints.length; i++) {
+        for (let j = i + 1; j < lastPoints.length; j++) {
+          const dx = lastPoints[i].x - lastPoints[j].x;
+          const dy = lastPoints[i].y - lastPoints[j].y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist > 120) continue;
+          const alpha = (1 - dist / 120) * 0.5;
+          const age = (lastPoints.length - Math.max(i, j)) / lastPoints.length;
+          ctx.beginPath();
+          ctx.moveTo(lastPoints[i].x, lastPoints[i].y);
+          ctx.lineTo(lastPoints[j].x, lastPoints[j].y);
+          ctx.strokeStyle = `hsla(${hue}, 80%, 65%, ${alpha * age})`;
+          ctx.lineWidth = (1 - dist / 120) * 1.5;
+          ctx.stroke();
+        }
+      }
+    }
+
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        mode = btn.dataset.mode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        particles = [];
+        lastPoints = [];
+      });
+    });
+
+    function wire(id, valId, setter) {
+      const el = document.getElementById(id);
+      el.addEventListener('input', () => {
+        setter(parseFloat(el.value));
+        document.getElementById(valId).textContent = el.value;
+      });
+    }
+
+    wire('hue', 'hueVal', v => hue = v);
+    wire('speed', 'speedVal', v => speed = v);
+    wire('decay', 'decayVal', v => decay = v);
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      particles = [];
+      lastPoints = [];
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fillRect(0, 0, W, H);
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.download = `art-${Date.now()}.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    });
+
+    draw();
+  </script>
+</body>
+</html>
