@@ -1,0 +1,3 @@
+# Both apps run on the Python 3.10+ standard library.
+# Optional: Claude-drafted replies in asking_monitor (falls back to templates without it).
+anthropic>=1.8.0

@@ -1,0 +1,24 @@
+{
+  "_note": "Copy to monitor_config.json and edit. Keys starting with _ are ignored.",
+  "subreddits": ["PersonalFinanceCanada", "TorontoRealEstate", "durham", "ontario", "askTO",
+                 "whitby", "ajax", "oshawa", "scarborough", "FirstTimeHomeBuyer"],
+  "feeds": [
+    {"name": "Example forum (replace with a real RSS/Atom URL)", "url": "https://example.com/forum/feed.xml"}
+  ],
+  "local_terms": ["Durham Region", "Whitby", "Ajax", "Pickering", "Oshawa", "Scarborough",
+                  "Brooklin", "Courtice", "Bowmanville", "Clarington", "GTA", "Toronto"],
+  "extra_keywords": [],
+  "alert_threshold": 45,
+  "draft_threshold": 55,
+  "max_age_hours": 72,
+  "webhook_url": "",
+  "user_agent": "script:whos-asking-monitor:0.1 (by /u/YOUR_REDDIT_USERNAME)",
+  "profile": {
+    "area": "Durham Region (Whitby, Ajax, Pickering, Oshawa) and Scarborough, Ontario",
+    "disclosure": "(Disclosure: I'm a mortgage agent with YOUR BROKERAGE, FSRA licence #M00000000.)",
+    "style_notes": "Friendly, plain English, practical.",
+    "community_rules": {
+      "r/PersonalFinanceCanada": "No self-promotion or soliciting clients; answers must stand on their own."
+    }
+  }
+}
