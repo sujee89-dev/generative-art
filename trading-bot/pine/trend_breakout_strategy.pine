@@ -23,12 +23,14 @@ entryLen = input.int(20, "Breakout: highest high of last N bars")
 exitLen  = input.int(10, "Exit: lowest low of last N bars")
 trendLen = input.int(200, "Trend filter: SMA length")
 secret   = input.string("change-me", "Webhook secret")
+// Backtest only from this date (free alternative to the Strategy Tester's paid custom date range).
+startAt  = input.time(timestamp("2015-01-01"), "Only trade from this date")
 
 upper = ta.highest(high, entryLen)[1]
 lower = ta.lowest(low, exitLen)[1]
 trend = ta.sma(close, trendLen)
 
-longEntry = strategy.position_size == 0 and close > upper and close > trend
+longEntry = time >= startAt and strategy.position_size == 0 and close > upper and close > trend
 longExit  = strategy.position_size > 0 and close < lower
 
 plot(upper, "Breakout level", color=color.teal)
