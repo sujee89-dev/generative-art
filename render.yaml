@@ -16,23 +16,25 @@ services:
       name: bot-data
       mountPath: /data
       sizeGB: 1
+    # Settings you change in the Render dashboard are `sync: false`, so a Blueprint sync never
+    # overwrites them (a sync once reset a live BROKER=kraken back to paper). Fill them in on the
+    # first deploy; suggested starting values are in the comments.
     envVars:
       - key: WEBHOOK_SECRET
         generateValue: true
-      - key: BROKER
-        value: paper
-      # The bot reads Kraken's daily BTC/CAD chart itself and trades Trend (200 SMA);
-      # no TradingView alert needed. Set to empty to rely on TradingView webhooks instead.
-      - key: AUTO_TRADE_SYMBOL
-        value: BTCCAD
-      - key: LIVE_TRADING
-        value: "false"
-      - key: MAX_POSITION_USD
-        value: "100"
-      - key: MAX_DAILY_LOSS_USD
-        value: "30"
-      - key: MAX_TRADES_PER_DAY
-        value: "10"
+      - key: BROKER  # paper, or kraken for real money
+        sync: false
+      - key: LIVE_TRADING  # false; true only for real money
+        sync: false
+      # The bot reads Kraken's daily BTC/CAD chart itself and trades Trend (200 SMA).
+      - key: AUTO_TRADE_SYMBOL  # BTCCAD
+        sync: false
+      - key: MAX_POSITION_USD  # 100 (CAD per crypto buy)
+        sync: false
+      - key: MAX_DAILY_LOSS_USD  # 30
+        sync: false
+      - key: MAX_TRADES_PER_DAY  # 10
+        sync: false
       - key: JOURNAL_PATH
         value: /data/trades.jsonl
       - key: STATE_PATH
@@ -41,6 +43,19 @@ services:
         sync: false
       - key: KRAKEN_SECRET
         sync: false
+      # Stock bot (Interactive Brokers through a separate ib-gateway private service; see README).
+      - key: STOCK_SYMBOLS  # e.g. SPY,QQQ,NVDA,META,TSLA,GOOGL,MSFT; empty = off
+        sync: false
+      - key: STOCK_POSITION_USD  # 1000 (USD per stock buy)
+        sync: false
+      - key: IBKR_HOST  # the ib-gateway service's internal address, e.g. ib-gateway-xxxx
+        sync: false
+      - key: IBKR_PORT  # 4004 = paper
+        sync: false
+      - key: STOCK_STATE_PATH
+        value: /data/stock_positions.json
+      - key: STOCK_JOURNAL_PATH
+        value: /data/stock_trades.jsonl
       - key: BINANCE_KEY
         sync: false
       - key: BINANCE_SECRET

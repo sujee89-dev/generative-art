@@ -78,6 +78,8 @@ class AutoTrader:
             self.engine.auto_status[self.symbol] = {"checked_at": now, "error": "no completed candles"}
             return None
         candle_time, close = candles[-1]
+        # Keep the broker's price current so /status values holdings right, even between trades.
+        self.engine.broker.mark(self.symbol, close)
         if candle_time == self._last_candle:
             return None  # already handled this day's candle
         holding = self.engine.broker.position_qty(self.symbol) > 0
