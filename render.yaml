@@ -1,0 +1,47 @@
+# Render Blueprint for the TradingView trading bot (see trading-bot/README.md, "Deploy online").
+services:
+  - type: web
+    name: tradingview-bot
+    runtime: docker
+    dockerContext: ./trading-bot
+    dockerfilePath: ./trading-bot/Dockerfile
+    # Starter never sleeps. The free plan sleeps when idle, and TradingView gives up on a
+    # webhook after a few seconds, so alerts would be lost while it wakes up.
+    plan: starter
+    # Closest Render region to Canada. (If you ever use Binance, change to frankfurt:
+    # Binance blocks API calls from US servers.)
+    region: ohio
+    healthCheckPath: /health
+    disk:
+      name: bot-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      - key: BROKER
+        value: paper
+      - key: LIVE_TRADING
+        value: "false"
+      - key: MAX_POSITION_USD
+        value: "100"
+      - key: MAX_DAILY_LOSS_USD
+        value: "30"
+      - key: MAX_TRADES_PER_DAY
+        value: "10"
+      - key: JOURNAL_PATH
+        value: /data/trades.jsonl
+      - key: STATE_PATH
+        value: /data/positions.json
+      - key: KRAKEN_KEY
+        sync: false
+      - key: KRAKEN_SECRET
+        sync: false
+      - key: BINANCE_KEY
+        sync: false
+      - key: BINANCE_SECRET
+        sync: false
+      - key: ALPACA_KEY
+        sync: false
+      - key: ALPACA_SECRET
+        sync: false
