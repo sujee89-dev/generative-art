@@ -112,8 +112,9 @@ Caveats:
 - `STOCK_MAX_DAILY_LOSS_USD` compares the whole IBKR account's value, so use an account that
   only the bot trades.
 - A live IBKR login needs a 2FA approval on your phone about once a week.
-- These services aren't in `render.yaml` on purpose: changing that file re-applies its env
-  values and could reset a live crypto setup.
+- The ib-gateway service isn't in `render.yaml`; create it by hand. The bot's own settings
+  are all `sync: false` there, so a Blueprint sync never overwrites values you set in the
+  dashboard. Turning Blueprint **Auto Sync** off is still the safest option.
 
 ## Risk controls (enforced by the bot, whatever the alert says)
 

@@ -246,6 +246,16 @@ class AutoTraderTests(unittest.TestCase):
         engine.broker.buy = real_buy
         self.assertEqual(trader.check()["side"], "buy")
 
+    def test_check_values_holdings_at_latest_close(self):
+        engine, _ = make_engine(max_position_usd=1000)
+        candles = [(i * 86400, 100.0) for i in range(199)] + [(199 * 86400, 110.0)]
+        trader = AutoTrader(engine, "BTCCAD", fetch=lambda s: candles)
+        trader.check()
+        engine.broker.last_price.clear()  # like a restart: price unknown
+        candles.append((200 * 86400, 120.0))
+        trader.check()
+        self.assertAlmostEqual(engine.broker.equity(), 9000 + 9.090909 * 120, places=3)
+
     def test_fetch_error_is_reported(self):
         engine, _ = make_engine()
         def boom(symbol):
