@@ -1,2 +1,3 @@
 ib_async==2.1.0
 tzdata
+anthropic==1.9.0

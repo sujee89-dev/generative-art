@@ -20,6 +20,7 @@ from bot.server import safe_status
 from bot.stockdata import fetch_stock_daily_candles, us_market_open
 from bot.engine import Rejected, TradingEngine
 from bot.server import make_handler
+from bot.news import NewsError, NewsGuard, claude_assessor, fetch_headlines
 
 SECRET = "test-secret-123456"
 
@@ -555,6 +556,130 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(json.loads(r.read()), {"ok": True})
         with urllib.request.urlopen(self.base + "/status") as r:
             self.assertEqual(json.loads(r.read())["trades_today"], 1)
+
+
+RSS = b"""<?xml version="1.0"?><rss><channel>
+<item><title>Bitcoin exchange hacked, withdrawals frozen</title><pubDate>Mon, 28 Sep 2026 10:00:00 GMT</pubDate></item>
+<item><title>Bitcoin edges higher</title><pubDate>Mon, 28 Sep 2026 08:00:00 GMT</pubDate></item>
+<item><title>Old story</title><pubDate>Fri, 25 Sep 2026 08:00:00 GMT</pubDate></item>
+</channel></rss>"""
+
+
+class FakeClaude:
+    """Stands in for anthropic.Anthropic(); returns a canned JSON answer."""
+
+    def __init__(self, answer, stop_reason="end_turn"):
+        self.answer, self.stop_reason, self.calls = answer, stop_reason, []
+        self.beta = self
+        self.messages = self
+
+    def create(self, **kw):
+        self.calls.append(kw)
+        block = type("Block", (), {"type": "text", "text": json.dumps(self.answer)})
+        return type("Msg", (), {"stop_reason": self.stop_reason, "content": [block]})
+
+
+class NewsTests(unittest.TestCase):
+    NOW = dt.datetime(2026, 9, 28, 12, tzinfo=dt.timezone.utc)
+
+    def setUp(self):
+        self.state = os.path.join(tempfile.mkdtemp(), "news.json")
+        self.now = {"t": self.NOW}
+        self.heads = {"bitcoin": ["Bitcoin exchange hacked"], "Nvidia stock": ["Nvidia beats earnings"]}
+        self.asked = []
+
+    def guard(self, verdicts, **kw):
+        def assess(batch):
+            self.asked.append(batch)
+            if isinstance(verdicts, Exception):
+                raise verdicts
+            return verdicts
+        return NewsGuard(["BTCCAD", "NVDA"], assess, self.state, fetch=lambda q, age: self.heads[q],
+                         now=lambda: self.now["t"], **kw)
+
+    def test_fetch_headlines_keeps_recent_newest_first(self):
+        opener = lambda req, timeout=None: io.BytesIO(RSS)
+        heads = fetch_headlines("bitcoin", 24, opener=opener, now=self.NOW)
+        self.assertEqual(heads, ["Bitcoin exchange hacked, withdrawals frozen", "Bitcoin edges higher"])
+
+    def test_severe_news_pauses_buys_but_not_sells(self):
+        g = self.guard([{"symbol": "BTCCAD", "severe": True, "reason": "exchange hack", "headline": "h"},
+                        {"symbol": "NVDA", "severe": False, "reason": "", "headline": ""}])
+        g.check()
+        self.assertIn("exchange hack", g.blocked("BTCCAD"))
+        self.assertIsNone(g.blocked("NVDA"))
+        engine, _ = make_engine(max_position_usd=1000)
+        engine.news_guard = g
+        with self.assertRaisesRegex(Rejected, "news pause"):
+            engine.handle_alert(alert("buy", 100, symbol="BTCCAD"))
+        self.assertEqual(engine.handle_alert(alert("buy", 100, symbol="NVDA"))["qty"], 10)
+        self.assertEqual(engine.handle_alert(alert("sell", 100, symbol="NVDA"))["side"], "sell")
+        # The pause survives a restart and ends after NEWS_PAUSE_HOURS.
+        self.assertIsNotNone(self.guard([]).blocked("BTCCAD"))
+        self.now["t"] += dt.timedelta(hours=25)
+        self.assertIsNone(g.blocked("BTCCAD"))
+        self.assertEqual(g.status()["paused"], {})
+
+    def test_only_new_headlines_go_to_claude(self):
+        g = self.guard([])
+        g.check()
+        g.check()
+        self.assertEqual(len(self.asked), 1)
+        self.heads["bitcoin"] = ["Something new", "Bitcoin exchange hacked"]
+        g.check()
+        self.assertEqual(list(self.asked[1]), ["BTCCAD"])
+
+    def test_failures_pause_nothing_and_retry(self):
+        g = self.guard(NewsError("Claude API error 529: overloaded"))
+        result = g.check()
+        self.assertIn("529", result["errors"][0])
+        self.assertIsNone(g.blocked("BTCCAD"))
+        g.check()
+        self.assertEqual(len(self.asked), 2)  # headlines weren't marked as seen
+
+    def test_unknown_symbols_from_model_are_ignored(self):
+        g = self.guard([{"symbol": "XYZ", "severe": True, "reason": "r", "headline": "h"}])
+        g.check()
+        self.assertEqual(g.pauses, {})
+
+    def test_covered_calls_skip_top_up_during_pause(self):
+        d = tempfile.mkdtemp()
+        engine, _ = make_engine(max_position_usd=1000)
+        gw = FakeOptionsGateway()
+        engine.broker = IBKRBroker(gw, os.path.join(d, "stocks.json"))
+        engine.broker.buy("NVDA", 4, 231.0)
+        engine.broker.mark("NVDA", 225.0)
+        g = self.guard([{"symbol": "NVDA", "severe": True, "reason": "fraud probe", "headline": "h"}])
+        g.check()
+        engine.news_guard = g
+        CoveredCallManager(engine, ["NVDA"], os.path.join(d, "c.json"), market_open=lambda: True,
+                           today=lambda: dt.date(2026, 9, 28)).check()
+        self.assertEqual(engine.broker.position_qty("NVDA"), 4)
+        self.assertIn("fraud probe", engine.auto_status["NVDA calls"]["note"])
+
+    def test_claude_assessor_request_and_errors(self):
+        client = FakeClaude({"assessments": [{"symbol": "NVDA", "severe": False, "reason": "", "headline": ""}]})
+        out = claude_assessor("claude-opus-5-5", client)({"NVDA": ["Nvidia beats earnings"]})
+        self.assertEqual(out[0]["symbol"], "NVDA")
+        kw = client.calls[0]
+        self.assertEqual(kw["model"], "claude-opus-5-5")
+        self.assertEqual(kw["output_config"]["format"]["type"], "json_schema")
+        self.assertIn("Nvidia beats earnings", kw["messages"][0]["content"])
+        with self.assertRaisesRegex(NewsError, "declined"):
+            claude_assessor(client=FakeClaude({}, stop_reason="refusal"))({"NVDA": ["x"]})
+        with self.assertRaisesRegex(NewsError, "unexpected"):
+            claude_assessor(client=FakeClaude({"nope": 1}))({"NVDA": ["x"]})
+
+    def test_news_settings(self):
+        env = {"WEBHOOK_SECRET": SECRET, "AUTO_TRADE_SYMBOL": "BTCCAD", "STOCK_SYMBOLS": "SPY,NVDA"}
+        self.assertFalse(Config.from_env(env).news_pause_enabled)
+        with self.assertRaisesRegex(ValueError, "ANTHROPIC_API_KEY"):
+            Config.from_env(dict(env, NEWS_PAUSE_ENABLED="true"))
+        cfg = Config.from_env(dict(env, NEWS_PAUSE_ENABLED="true", ANTHROPIC_API_KEY="k"))
+        self.assertEqual(cfg.news_symbols, ["BTCCAD", "SPY", "NVDA"])
+        self.assertEqual((cfg.news_model, cfg.news_pause_hours), ("claude-opus-5-5", 24.0))
+        cfg = Config.from_env(dict(env, NEWS_SYMBOLS="btccad", NEWS_MODEL="claude-haiku-4-5"))
+        self.assertEqual((cfg.news_symbols, cfg.news_model), (["BTCCAD"], "claude-haiku-4-5"))
 
 
 if __name__ == "__main__":

@@ -26,6 +26,7 @@ class TradingEngine:
         self._trades_today = 0
         self.halted_reason = None
         self.auto_status = {}  # symbol -> last AutoTrader check, shown on /status
+        self.news_guard = None  # optional NewsGuard: blocks new buys after severe news
 
     def handle_alert(self, payload):
         """Validate and act on one alert. Returns a dict describing what happened."""
@@ -74,6 +75,7 @@ class TradingEngine:
             raise Rejected("MAX_TRADES_PER_DAY reached", status=409)
         if self.broker.position_qty(symbol) > 0:
             return {"symbol": symbol, "side": "buy", "qty": 0, "note": "already in position"}
+        self.check_news(symbol)
         if crypto:
             # Crypto can be bought in fractions; round down to 6 decimals.
             qty = math.floor(self.cfg.max_position_usd / price * 1e6) / 1e6
@@ -84,6 +86,12 @@ class TradingEngine:
         result = self.broker.buy(symbol, qty, price, crypto=crypto)
         self._trades_today += 1
         return result
+
+    def check_news(self, symbol):
+        """Raise Rejected if a news pause blocks buying `symbol`. Sells are never blocked."""
+        reason = self.news_guard.blocked(symbol) if self.news_guard else None
+        if reason:
+            raise Rejected(reason, status=409)
 
     def _roll_day(self):
         today = self._today()

@@ -19,6 +19,7 @@ import os
 import threading
 
 from .brokers import BrokerError
+from .engine import Rejected
 from .stockdata import NEW_YORK, us_market_open
 
 log = logging.getLogger("trading-bot")
@@ -144,6 +145,10 @@ class CoveredCallManager:
                 return self._status(symbol, note=f"100 shares cost more than CC_MAX_SHARES_USD ({self.max_shares_usd:.0f})")
             if self.engine.halted_reason:
                 return self._status(symbol, note=f"trading halted: {self.engine.halted_reason}")
+            try:
+                self.engine.check_news(symbol)
+            except Rejected as e:
+                return self._status(symbol, note=f"not topping up: {e}")
             result = broker.buy(symbol, 100 - held, price)
             result["note"] = "top-up to 100 shares for covered calls"
             self.engine._journal(result)
