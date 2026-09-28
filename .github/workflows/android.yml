@@ -1,0 +1,60 @@
+name: Build Android app
+
+# Builds the Fire tablet / Android app from the ahara/ web app and publishes it
+# as the "ahara-latest" release, so the newest APK is always at:
+# https://github.com/sujee89-dev/generative-art/releases/download/ahara-latest/ahara-reading-room.apk
+on:
+  push:
+    branches: [main, claude/bilingual-reading-app-ahara-bnxez5]
+    paths: ["ahara/**", "android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Copy the web app into the Android assets
+        run: |
+          mkdir -p android/app/src/main/assets/www
+          rsync -a --delete --exclude tools --exclude README.md --exclude sw.js ahara/ android/app/src/main/assets/www/
+
+      - name: Build the APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle -p android assembleRelease --no-daemon
+
+      - name: Rename
+        run: cp android/app/build/outputs/apk/release/app-release.apk ahara-reading-room.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ahara-reading-room-apk
+          path: ahara-reading-room.apk
+
+      - name: Publish as the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ahara-latest --yes --cleanup-tag || true
+          gh release create ahara-latest ahara-reading-room.apk \
+            --target "${{ github.sha }}" \
+            --title "Ahara's Reading Room for Android and Fire tablets (build ${{ github.run_number }})" \
+            --notes "Open this page on the tablet and tap ahara-reading-room.apk to download and install it. Works offline. Build ${{ github.run_number }} from ${{ github.sha }}."

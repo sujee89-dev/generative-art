@@ -1,1 +1,6 @@
 __pycache__/
+
+# Built by the Android workflow
+android/app/src/main/assets/
+android/**/build/
+android/.gradle/

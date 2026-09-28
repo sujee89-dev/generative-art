@@ -1,0 +1,39 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.ahara.readingroom"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.ahara.readingroom"
+        minSdk 22          // Fire OS 5 and newer
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
+        versionName "1." + (System.getenv("VERSION_CODE") ?: "0")
+    }
+
+    signingConfigs {
+        release {
+            // A dedicated key for this family app, kept in the repo so every build can
+            // install over the last one without losing progress saved on the tablet.
+            storeFile file("../keystore/ahara.jks")
+            storePassword "ahara-reading-room"
+            keyAlias "ahara"
+            keyPassword "ahara-reading-room"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}

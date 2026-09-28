@@ -408,11 +408,14 @@ function openSoundCheck() {
     d.innerHTML = `<h2>${esc(c.title)}</h2><p class="hint">${esc(c.intro)}</p>${rows}
       <div class="speed"><span>${esc(c.slow)}</span><input type="range" id="speed" min="0.6" max="1.3" step="0.1" value="${speed}" aria-label="${esc(c.speed)}"><span>${esc(c.fast)}</span></div>
       <b>${esc(c.tipsH)}</b><ul class="tips">${c.tips.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+      ${window.AndroidTTS && window.AndroidTTS.openSettings ? `<div class="btns"><button type="button" class="btn alt" id="ttsSettings">⚙️ Tablet speech settings</button></div>` : ""}
       <div class="btns" style="margin-top:12px"><button type="button" class="btn" id="closeCheck">${esc(c.close)}</button></div>`;
     d.querySelectorAll("[data-test]").forEach(b => b.onclick = () => say(c.sample[b.dataset.test], { lang: b.dataset.test }));
     d.querySelectorAll("select").forEach(s => s.onchange = () => { store.set("voice:" + s.id.slice(6), s.value); say(c.sample[s.id.slice(6)], { lang: s.id.slice(6) }); });
     $("#speed", d).onchange = e => store.set("speed", +e.target.value);
     $("#closeCheck", d).onclick = () => d.close();
+    const ts = $("#ttsSettings", d);
+    if (ts) ts.onclick = () => window.AndroidTTS.openSettings();
   };
   draw();
   if (!d.dataset.watching) { d.dataset.watching = "1"; Speech.onChange(() => { if (d.open) openSoundCheck.redraw(); }); }
