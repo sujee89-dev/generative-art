@@ -5,6 +5,8 @@ Run from anywhere:  python3 ahara/tools/build_data.py
 
 Each word is stored with its syllables joined by "|", e.g. "but|ter|fly".
 A source word may already contain "|" to override the automatic split.
+French and Tamil words carry their English meaning after "~" (from
+src/gloss-*.txt, or from pictures.tsv for picture words).
 """
 import json
 import re
@@ -283,6 +285,21 @@ def read_pictures():
     return rows
 
 
+def read_gloss(lang):
+    path = SRC / f"gloss-{lang}.txt"
+    g = {}
+    if not path.exists():
+        return g
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        for entry in line.split(";"):
+            if "=" in entry:
+                k, v = entry.split("=", 1)
+                g[k.strip()] = v.strip()
+    return g
+
+
 def main():
     pictures = read_pictures()
     data = {"pictures": pictures, "words": {}}
@@ -294,8 +311,23 @@ def main():
             if w and " " not in w and w.lower() not in seen:
                 seen.add(w.lower())
                 words.append(w)
-        data["words"][lang] = [syllabify(lang, w) for w in words]
-        print(f"{lang}: {len(words)} words")
+        gloss = read_gloss(lang)
+        for p in pictures:
+            if p.get(lang) and p.get("en"):
+                gloss.setdefault(p[lang], p["en"])
+        out, missing = [], []
+        for w in words:
+            plain = w.replace("|", "")
+            entry = syllabify(lang, w)
+            if lang != "en":
+                meaning = gloss.get(plain) or gloss.get(plain.lower())
+                if meaning:
+                    entry += "~" + meaning
+                else:
+                    missing.append(plain)
+            out.append(entry)
+        data["words"][lang] = out
+        print(f"{lang}: {len(words)} words" + (f", {len(missing)} without meaning: {' '.join(missing[:20])}" if missing else ""))
     print(f"pictures: {len(pictures)}")
     OUT.parent.mkdir(parents=True, exist_ok=True)
     body = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
