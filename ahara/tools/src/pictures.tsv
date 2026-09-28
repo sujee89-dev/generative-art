@@ -1,0 +1,290 @@
+# emoji	english (* = uncountable/plural: "some")	french	gender (m/f, * = uncountable: du/de la)	tamil	category
+🐱	cat	chat	m	பூனை	animal
+🐶	dog	chien	m	நாய்	animal
+🐭	mouse	souris	f	எலி	animal
+🐰	rabbit	lapin	m	முயல்	animal
+🦊	fox	renard	m	நரி	animal
+🐻	bear	ours	m	கரடி	animal
+🐼	panda	panda	m	பாண்டா	animal
+🐨	koala	koala	m	கோலா	animal
+🐯	tiger	tigre	m	புலி	animal
+🦁	lion	lion	m	சிங்கம்	animal
+🐮	cow	vache	f	பசு	animal
+🐷	pig	cochon	m	பன்றி	animal
+🐸	frog	grenouille	f	தவளை	animal
+🐵	monkey	singe	m	குரங்கு	animal
+🐔	hen	poule	f	கோழி	animal
+🐧	penguin	pingouin	m	பென்குயின்	animal
+🐦	bird	oiseau	m	பறவை	animal
+🐤	chick	poussin	m	கோழிக்குஞ்சு	animal
+🦆	duck	canard	m	வாத்து	animal
+🦅	eagle	aigle	m	கழுகு	animal
+🦉	owl	hibou	m	ஆந்தை	animal
+🦇	bat	chauve-souris	f	வௌவால்	animal
+🐺	wolf	loup	m	ஓநாய்	animal
+🐴	horse	cheval	m	குதிரை	animal
+🦄	unicorn	licorne	f		animal
+🐝	bee	abeille	f	தேனீ	animal
+🐛	caterpillar	chenille	f	கம்பளிப்பூச்சி	animal
+🦋	butterfly	papillon	m	பட்டாம்பூச்சி	animal
+🐌	snail	escargot	m	நத்தை	animal
+🐞	ladybug	coccinelle	f		animal
+🐜	ant	fourmi	f	எறும்பு	animal
+🕷️	spider	araignée	f	சிலந்தி	animal
+🐢	turtle	tortue	f	ஆமை	animal
+🐍	snake	serpent	m	பாம்பு	animal
+🦎	lizard	lézard	m	பல்லி	animal
+🐙	octopus	pieuvre	f		animal
+🦀	crab	crabe	m	நண்டு	animal
+🐟	fish	poisson	m	மீன்	animal
+🐬	dolphin	dauphin	m	டால்பின்	animal
+🐳	whale	baleine	f	திமிங்கலம்	animal
+🦈	shark	requin	m	சுறா	animal
+🐊	crocodile	crocodile	m	முதலை	animal
+🐘	elephant	éléphant	m	யானை	animal
+🦒	giraffe	girafe	f	ஒட்டகச்சிவிங்கி	animal
+🦓	zebra	zèbre	m	வரிக்குதிரை	animal
+🦏	rhino	rhinocéros	m	காண்டாமிருகம்	animal
+🦛	hippo	hippopotame	m	நீர்யானை	animal
+🐪	camel	chameau	m	ஒட்டகம்	animal
+🐐	goat	chèvre	f	ஆடு	animal
+🐑	sheep	mouton	m		animal
+🦌	deer	cerf	m	மான்	animal
+🐿️	squirrel	écureuil	m	அணில்	animal
+🦔	hedgehog	hérisson	m		animal
+🐓	rooster	coq	m	சேவல்	animal
+🦃	turkey	dinde	f	வான்கோழி	animal
+🦚	peacock	paon	m	மயில்	animal
+🦜	parrot	perroquet	m	கிளி	animal
+🦢	swan	cygne	m	அன்னம்	animal
+🦩	flamingo	flamant	m		animal
+🦘	kangaroo	kangourou	m	கங்காரு	animal
+🦍	gorilla	gorille	m	கொரில்லா	animal
+🐆	leopard	léopard	m	சிறுத்தை	animal
+🦦	otter	loutre	f	நீர்நாய்	animal
+🦙	llama	lama	m		animal
+🦭	seal	phoque	m		animal
+🦞	lobster	homard	m		animal
+🦐	shrimp	crevette	f	இறால்	animal
+🪲	beetle	scarabée	m	வண்டு	animal
+🦟	mosquito	moustique	m	கொசு	animal
+🪰	fly	mouche	f	ஈ	animal
+🪱	worm	ver	m	புழு	animal
+🦖	dinosaur	dinosaure	m	டைனோசர்	animal
+🐉	dragon	dragon	m		animal
+🦥	sloth	paresseux	m		animal
+🐃	buffalo	buffle	m	எருமை	animal
+🍎	apple	pomme	f	ஆப்பிள்	food
+🍌	banana	banane	f	வாழைப்பழம்	food
+🍇	grapes*	raisin	m	திராட்சை	food
+🍓	strawberry	fraise	f	ஸ்ட்ராபெர்ரி	food
+🍊	orange	orange	f	ஆரஞ்சு	food
+🍋	lemon	citron	m	எலுமிச்சை	food
+🍉	watermelon	pastèque	f	தர்பூசணி	food
+🍍	pineapple	ananas	m	அன்னாசி	food
+🥭	mango	mangue	f	மாம்பழம்	food
+🍑	peach	pêche	f		food
+🍒	cherry	cerise	f	செர்ரி	food
+🍐	pear	poire	f	பேரிக்காய்	food
+🥝	kiwi	kiwi	m	கிவி	food
+🥥	coconut	noix de coco	f	தேங்காய்	food
+🍅	tomato	tomate	f	தக்காளி	food
+🥕	carrot	carotte	f	கேரட்	food
+🌽	corn*	maïs	m*	சோளம்	food
+🥔	potato	pomme de terre	f	உருளைக்கிழங்கு	food
+🧅	onion	oignon	m	வெங்காயம்	food
+🧄	garlic*	ail	m*	பூண்டு	food
+🥒	cucumber	concombre	m	வெள்ளரிக்காய்	food
+🥦	broccoli*	brocoli	m	ப்ரோக்கோலி	food
+🍆	eggplant	aubergine	f	கத்தரிக்காய்	food
+🌶️	chili	piment	m	மிளகாய்	food
+🍄	mushroom	champignon	m	காளான்	food
+🥜	peanut	cacahuète	f	வேர்க்கடலை	food
+🍞	bread*	pain	m*	ரொட்டி	food
+🧀	cheese*	fromage	m*	பாலாடைக்கட்டி	food
+🥚	egg	œuf	m	முட்டை	food
+🍚	rice*	riz	m*	சோறு	food
+🍯	honey*	miel	m*	தேன்	food
+🍰	cake	gâteau	m	கேக்	food
+🍪	cookie	biscuit	m	பிஸ்கட்	food
+🍩	donut	beignet	m		food
+🍦	ice cream*	glace	f*	ஐஸ்கிரீம்	food
+🍭	lollipop	sucette	f	லாலிபாப்	food
+🍬	candy	bonbon	m	மிட்டாய்	food
+🍫	chocolate*	chocolat	m*	சாக்லேட்	food
+🍕	pizza	pizza	f	பீட்சா	food
+🧈	butter*	beurre	m*	வெண்ணெய்	food
+🧂	salt*	sel	m*	உப்பு	food
+🍿	popcorn*	pop-corn	m*	பாப்கார்ன்	food
+🥐	croissant	croissant	m		food
+🥗	salad	salade	f		food
+🥑	avocado	avocat	m		food
+🧁	cupcake	petit gâteau	m		food
+🥞	pancakes*	crêpe	f		food
+🫐	blueberries*	myrtille	f		food
+🥛	milk*	lait	m*	பால்	drink
+🧃	juice*	jus	m*	பழச்சாறு	drink
+☕	coffee*	café	m*	காபி	drink
+🍵	tea*	thé	m*	தேநீர்	drink
+💧	water*	eau	f*	தண்ணீர்	drink
+☀️	sun	soleil	m	சூரியன்	nature
+🌙	moon	lune	f	நிலா	nature
+⭐	star	étoile	f	நட்சத்திரம்	nature
+☁️	cloud	nuage	m	மேகம்	nature
+🌧️	rain*	pluie	f	மழை	nature
+🌈	rainbow	arc-en-ciel	m	வானவில்	nature
+❄️	snow*	neige	f	பனி	nature
+⚡	lightning*	éclair	m	மின்னல்	nature
+🔥	fire	feu	m	நெருப்பு	nature
+🌊	wave	vague	f	அலை	nature
+🌳	tree	arbre	m	மரம்	nature
+🌴	palm tree	palmier	m	தென்னைமரம்	nature
+🌵	cactus	cactus	m	கள்ளி	nature
+🌸	flower	fleur	f	பூ	nature
+🌹	rose	rose	f	ரோஜா	nature
+🌻	sunflower	tournesol	m	சூரியகாந்தி	nature
+🌷	tulip	tulipe	f		nature
+🍀	clover	trèfle	m		nature
+🍁	leaf	feuille	f	இலை	nature
+🌱	plant	pousse	f	செடி	nature
+🪨	rock	rocher	m	பாறை	nature
+⛰️	mountain	montagne	f	மலை	nature
+🌋	volcano	volcan	m	எரிமலை	nature
+🏝️	island	île	f	தீவு	nature
+🏖️	beach	plage	f	கடற்கரை	nature
+🌍	earth	terre	f	பூமி	nature
+🪐	planet	planète	f	கிரகம்	nature
+🐚	shell	coquillage	m	சங்கு	nature
+🪺	nest	nid	m	கூடு	nature
+🪵	log	bûche	f	மரக்கட்டை	nature
+🪶	feather	plume	f	இறகு	nature
+⚽	ball	ballon	m	பந்து	thing
+🪁	kite	cerf-volant	m	பட்டம்	thing
+🎈	balloon		m	பலூன்	thing
+🧸	teddy bear	nounours	m	பொம்மை	thing
+🪀	yo-yo	yo-yo	m		thing
+🎁	gift	cadeau	m	பரிசு	thing
+📖	book	livre	m	புத்தகம்	thing
+✏️	pencil	crayon	m	பென்சில்	thing
+🖊️	pen	stylo	m	பேனா	thing
+📏	ruler	règle	f	அளவுகோல்	thing
+✂️	scissors*		m	கத்தரிக்கோல்	thing
+🎒	backpack	sac	m	பை	thing
+🔑	key	clé	f	சாவி	thing
+🔒	lock	cadenas	m	பூட்டு	thing
+🚪	door	porte	f	கதவு	thing
+🪟	window	fenêtre	f	ஜன்னல்	thing
+🛏️	bed	lit	m	கட்டில்	thing
+🪑	chair	chaise	f	நாற்காலி	thing
+🧼	soap	savon	m	சோப்பு	thing
+🧹	broom	balai	m	துடைப்பம்	thing
+🪣	bucket	seau	m	வாளி	thing
+💡	light bulb	ampoule	f	மின்விளக்கு	thing
+🕯️	candle	bougie	f	மெழுகுவர்த்தி	thing
+⏰	clock	réveil	m	கடிகாரம்	thing
+⌚	watch	montre	f	கைக்கடிகாரம்	thing
+📱	phone	téléphone	m	தொலைபேசி	thing
+💻	computer	ordinateur	m	கணினி	thing
+📺	TV	télé	f	தொலைக்காட்சி	thing
+📷	camera	appareil photo	m		thing
+🎸	guitar	guitare	f	கிட்டார்	thing
+🥁	drum	tambour	m	மேளம்	thing
+🎺	trumpet	trompette	f		thing
+🎹	piano	piano	m	பியானோ	thing
+🔔	bell	cloche	f	மணி	thing
+🧩	puzzle	puzzle	m	புதிர்	thing
+🎲	dice*	dé	m	பகடை	thing
+🔨	hammer	marteau	m	சுத்தியல்	thing
+🪜	ladder	échelle	f	ஏணி	thing
+🧲	magnet	aimant	m	காந்தம்	thing
+🧺	basket	panier	m	கூடை	thing
+☂️	umbrella	parapluie	m	குடை	thing
+👓	glasses*	lunettes	f		thing
+🪞	mirror	miroir	m	கண்ணாடி	thing
+💍	ring	bague	f	மோதிரம்	thing
+👑	crown	couronne	f	கிரீடம்	thing
+🪙	coin	pièce	f	நாணயம்	thing
+✉️	letter	lettre	f	கடிதம்	thing
+📦	box	boîte	f	பெட்டி	thing
+🧵	thread*	fil	m	நூல்	thing
+🪡	needle	aiguille	f	ஊசி	thing
+🥣	bowl	bol	m	கிண்ணம்	thing
+🥄	spoon	cuillère	f	கரண்டி	thing
+🍽️	plate	assiette	f	தட்டு	thing
+🗺️	map	carte	f	வரைபடம்	thing
+🏆	trophy	trophée	m	கோப்பை	thing
+🥇	medal	médaille	f	பதக்கம்	thing
+🎵	music*	musique	f	இசை	thing
+🎃	pumpkin	citrouille	f	பூசணிக்காய்	thing
+🦴	bone	os	m	எலும்பு	thing
+🧊	ice cube	glaçon	m	பனிக்கட்டி	thing
+🛝	slide	toboggan	m	சறுக்கு	thing
+🎀	ribbon	ruban	m		thing
+🖍️	crayon	craie	f		thing
+🍼	baby bottle	biberon	m		thing
+🧦	sock	chaussette	f	காலுறை	clothes
+👕	shirt	tee-shirt	m	சட்டை	clothes
+👖	jeans*	pantalon	m	கால்சட்டை	clothes
+👗	dress	robe	f	உடை	clothes
+👟	shoe	chaussure	f	காலணி	clothes
+👒	hat	chapeau	m	தொப்பி	clothes
+🧤	gloves*	gant	m	கையுறை	clothes
+🧣	scarf	écharpe	f		clothes
+🧥	coat	manteau	m	மேலங்கி	clothes
+👑	crown	couronne	f	கிரீடம்	clothes
+🚗	car	voiture	f	கார்	vehicle
+🚌	bus	bus	m	பேருந்து	vehicle
+🚲	bike	vélo	m	மிதிவண்டி	vehicle
+🏍️	motorbike	moto	f		vehicle
+🚂	train	train	m	ரயில்	vehicle
+✈️	plane	avion	m	விமானம்	vehicle
+🚁	helicopter	hélicoptère	m	ஹெலிகாப்டர்	vehicle
+🚀	rocket	fusée	f	ராக்கெட்	vehicle
+⛵	boat	bateau	m	படகு	vehicle
+🚢	ship	navire	m	கப்பல்	vehicle
+🚜	tractor	tracteur	m	டிராக்டர்	vehicle
+🚑	ambulance	ambulance	f	ஆம்புலன்ஸ்	vehicle
+🚕	taxi	taxi	m	டாக்சி	vehicle
+🛺	rickshaw	rickshaw	m	ஆட்டோ	vehicle
+🚚	truck	camion	m	லாரி	vehicle
+🛵	scooter	scooter	m	ஸ்கூட்டர்	vehicle
+🛶	canoe	canoë	m	தோணி	vehicle
+⚓	anchor	ancre	f	நங்கூரம்	thing
+🏠	house	maison	f	வீடு	place
+🏫	school	école	f	பள்ளி	place
+🏥	hospital	hôpital	m	மருத்துவமனை	place
+🏰	castle	château	m	கோட்டை	place
+⛺	tent	tente	f	கூடாரம்	place
+🏪	shop	magasin	m	கடை	place
+🛕	temple	temple	m	கோயில்	place
+🌉	bridge	pont	m	பாலம்	place
+⛲	fountain	fontaine	f	நீரூற்று	place
+🎪	circus	cirque	m	சர்க்கஸ்	place
+👁️	eye	œil	m	கண்	body
+👂	ear	oreille	f	காது	body
+👃	nose	nez	m	மூக்கு	body
+👄	mouth	bouche	f	வாய்	body
+👅	tongue	langue	f	நாக்கு	body
+🦷	tooth	dent	f	பல்	body
+✋	hand	main	f	கை	body
+🦶	foot	pied	m	கால்	body
+🦵	leg	jambe	f		body
+💪	arm	bras	m		body
+🧠	brain	cerveau	m	மூளை	body
+❤️	heart	cœur	m	இதயம்	body
+👶	baby	bébé	m	குழந்தை	people
+👧	girl	fille	f	சிறுமி	people
+👦	boy	garçon	m	சிறுவன்	people
+👩	mom	maman	f	அம்மா	people
+👨	dad	papa	m	அப்பா	people
+👵	grandma	mamie	f	பாட்டி	people
+👴	grandpa	papi	m	தாத்தா	people
+🧑‍⚕️	doctor	docteur	m	மருத்துவர்	people
+🧑‍🏫	teacher	maîtresse	f	ஆசிரியர்	people
+🧑‍🚒	firefighter	pompier	m		people
+🧑‍🌾	farmer	fermier	m	விவசாயி	people
+👸	princess	princesse	f	இளவரசி	people
+🤴	prince	prince	m	இளவரசன்	people
+🤡	clown	clown	m	கோமாளி	people
+🧑‍🚀	astronaut	astronaute	m	விண்வெளி வீரர்	people
+🤖	robot	robot	m	ரோபோ	thing

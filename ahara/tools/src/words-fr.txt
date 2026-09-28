@@ -1,0 +1,68 @@
+# Un ou plusieurs mots par ligne. | force une coupure de syllabe.
+# syllabes simples
+papa maman bébé mamie papi tata tonton ami amie lama moto vélo radio piano photo tomate salade banane pomme poire lapin canard cheval mouton poule vache chat chien souris lion tigre ours loup renard zèbre singe koala panda
+la le les un une des et est il elle on nous vous ils elles je tu me te se ma mon ta ton sa son mes tes ses oui non ici là
+lit pot rat riz sol vol mur jus lac sac bol nid os nez pied main dos cou bras dent œil
+ami lune rue mur fil midi samedi lundi mardi pilote tulipe domino kiwi judo pull jupe robe tapis dune mare pile rire lire dire bise lime
+# syllabes avec ch ou an on in
+chat chaton chocolat chapeau chemise cheval chèvre chien chaise chanson chambre cochon vache bouche mouche poche niche riche
+maman enfant éléphant orange dimanche manger danser chanter chanson blanc grand banc ange lampe rampe jambe tante
+bonbon ballon mouton bouton melon citron savon garçon maison poisson poussin cochon crayon avion camion pont rond long son bon non nom ombre oncle
+lapin sapin jardin matin moulin raisin dauphin pingouin coussin marin requin vin pain main bain train sain faim plein
+# ou oi au eau
+loup roue joue soupe poule chou genou hibou caillou bijou nounours ours tout doux fou cou mou sous bouche
+roi loi moi toi soi joie oie noix voix bois mois poire boire voir trois droit froid étoile oiseau poisson armoire histoire
+beau eau peau seau veau bateau gâteau chapeau château oiseau cadeau manteau rideau marteau couteau taureau chameau
+auto chaud faute jaune sauce saute pause taupe
+# sons plus difficiles
+fille famille feuille abeille soleil oreille bouteille grenouille chenille citrouille papillon crayon noyau
+montagne campagne champignon peigne araignée ligne cygne agneau
+photo phare phoque éléphant dauphin téléphone
+écureuil fauteuil œil œuf bœuf cœur sœur fleur beurre heure peur jeu feu bleu deux yeux cheveux neveu
+# famille et gens
+papa maman bébé frère sœur grand-mère grand-père papi mamie tante oncle cousin cousine famille ami amie copain copine fille garçon enfant enfants monsieur madame maîtresse maître docteur pompier fermier boulanger pilote roi reine prince princesse
+# corps
+tête cheveux visage œil yeux oreille nez bouche lèvre dent dents langue cou épaule bras coude main doigt doigts pouce ventre dos jambe genou pied pieds orteil cœur peau
+# maison
+maison chambre cuisine salon salle jardin porte fenêtre mur toit escalier lit table chaise fauteuil canapé lampe tapis rideau armoire placard miroir horloge réveil bain douche savon serviette brosse peigne oreiller couverture tasse verre assiette bol cuillère fourchette couteau casserole four frigo
+# école
+école classe cahier livre crayon stylo gomme règle colle ciseaux cartable trousse tableau craie lettre mot phrase page histoire dessin peinture chanson récréation maîtresse élève
+# nourriture
+pomme poire banane orange citron fraise cerise raisin melon pêche prune ananas mangue kiwi abricot noix tomate carotte salade haricot petit pois pomme de terre oignon chou poireau courgette concombre champignon citrouille pain beurre fromage lait œuf jambon poulet poisson riz pâtes soupe gâteau biscuit bonbon chocolat confiture miel sucre sel crêpe tarte glace yaourt jus eau thé café goûter petit-déjeuner déjeuner dîner repas
+# animaux
+chat chien lapin souris cheval âne vache veau cochon mouton agneau chèvre poule coq poussin canard oie dinde oiseau pigeon moineau hibou aigle perroquet pingouin cygne poisson requin baleine dauphin phoque crabe tortue grenouille serpent lézard crocodile lion tigre ours loup renard singe zèbre girafe éléphant hippopotame rhinocéros kangourou koala panda écureuil hérisson abeille fourmi papillon chenille escargot araignée mouche coccinelle moustique ver dinosaure dragon licorne
+# nature
+soleil lune étoile ciel nuage pluie neige vent orage arc-en-ciel arbre feuille fleur herbe graine racine branche forêt bois montagne colline rivière lac mer océan plage sable île vague coquillage caillou pierre rocher terre monde planète jour nuit matin soir printemps été automne hiver
+# couleurs et formes
+rouge bleu vert jaune orange violet rose marron noir blanc gris doré couleur rond carré triangle cercle ligne point forme cœur étoile
+# nombres
+un deux trois quatre cinq six sept huit neuf dix onze douze treize quatorze quinze seize vingt trente cent mille zéro premier première dernier moitié
+# jours et mois
+lundi mardi mercredi jeudi vendredi samedi dimanche janvier février mars avril mai juin juillet août septembre octobre novembre décembre semaine mois année aujourd'hui demain hier
+# vêtements
+chapeau bonnet casquette manteau veste robe jupe chemise pull pantalon short chaussette chaussure botte gant écharpe pyjama bouton poche ceinture lunettes
+# jouets et jeux
+jouet ballon poupée nounours toupie puzzle jeu dé cube vélo trottinette balançoire toboggan bulle cerf-volant tambour guitare piano flûte trompette robot fusée train
+# véhicules et lieux
+voiture bus camion moto vélo train avion bateau fusée tracteur taxi hélicoptère métro route rue pont parc ferme zoo magasin marché boulangerie ville village école bibliothèque musée hôpital gare château cirque
+# verbes
+aller venir courir sauter marcher parler chanter danser nager grimper lire écrire dessiner peindre cuisiner manger boire dormir rire pleurer jouer regarder écouter penser partager aider aimer vouloir trouver gagner donner prendre faire voir entendre sentir toucher ouvrir fermer laver brosser construire voler compter chercher cacher tomber monter descendre apprendre grandir
+# adjectifs
+grand grande petit petite gros grosse long longue court haut bas chaud froid doux dur mou propre sale neuf vieux jeune gentil gentille drôle content contente triste fatigué rapide lent joli jolie beau belle fort calme lourd léger plein vide sucré salé
+# mots plus longs
+anniversaire bicyclette crocodile dinosaure hélicoptère hippopotame parapluie téléphone ordinateur boulangerie bibliothèque chocolat papillon coccinelle kangourou tortue citrouille écureuil éléphant grenouille marionnette trampoline balançoire aventure magicien pirate sorcière fantôme extraterrestre astronaute vacances cadeau surprise
+# verbes conjugués courants
+est sont a ont va vont fait font dit voit peut veut sait mange joue saute court lit dort boit chante danse nage parle regarde écoute aime prend met vient part tombe monte rit pleure crie cherche trouve donne porte ouvre ferme lave cuit coupe dessine colorie compte range
+je tu il elle nous vous ils elles mange manges mangeons mangez mangent joue joues jouons jouez jouent suis es sommes êtes ai as avons avez vais vas allons allez
+# petits mots
+à au aux de du des en dans sur sous avec sans pour par chez vers avant après devant derrière entre près loin très trop peu beaucoup encore aussi mais ou donc car quand comme si puis alors déjà toujours jamais souvent parfois bien mal vite oui non merci bonjour bonsoir salut au revoir s'il te plaît pardon bravo
+qui que quoi où comment pourquoi combien quel quelle
+# familles de mots
+lapin lapine lapereau chat chatte chaton chien chienne chiot poule poulet poussin vache veau taureau cheval jument poulain mouton brebis agneau cochon truie porcelet canard cane caneton
+fleur fleuri fleuriste pain boulangerie boulanger lait laitier jardin jardinier jardiner pêche pêcheur école écolier écolière
+# plus de noms
+abricot aiguille aile allumette ambulance ampoule anneau aquarium arbre arrosoir assiette autobus avion bague baguette baignoire balai balle banc bananier barque bassin bateau bâton bébé berceau bête beurre bijou bille biscuit bocal boîte bol bonhomme bonnet bosse botte bouche bouchon bougie boule bouquet bourgeon bouteille bras brioche brosse brouette buisson bureau cabane cadeau cage caisse cahier camion canapé canne carotte carte carton casque casserole ceinture cerise chaise chambre champ chandelle chapeau charrette château chaussette chemin cheminée chemise chenille chèvre chiffre cirque ciseaux citron clé cloche clown coccinelle coffre colle collier colline confiture copain coq coquille corde corps côte coton cou coude couronne couteau crabe craie crayon crème cuillère cuisine dame dé dent dessert dinde doigt dos douche drapeau eau échelle écharpe éclair écran enveloppe épée éponge escalier escargot étagère étoile fable fantôme farine fée fenêtre fer ferme feu feuille ficelle fil flaque flèche fleur flûte forêt fourchette fourmi fraise frite fromage fruit fumée fusée gant garage gare gâteau gazon genou gilet girafe glace gomme goutte graine grenier grenouille griffe grotte guitare hache hamac haricot herbe hérisson horloge hotte igloo image insecte jambe jardin jouet journal jupe jus kangourou lac laine lampe lapin légume lettre lézard lion lit livre loup lunettes machine magasin main maison manteau marché marteau masque médaille melon menton miel miroir montagne montre morceau mouchoir moufle moulin moustache mur musique nappe navet neige nez nid noix nuage oie oignon ongle orange oreille oreiller os ours outil page paille pain panier pantalon papier parapluie parc pâte patte peigne pelle perle phare pied pierre pinceau pingouin pipe piscine placard plage plante plat plume poche poêle poire poisson pomme pompier pont porte poubelle poule poupée prairie prince prune puits pull pyjama quai queue radis raisin rame râteau renard requin rideau rivière robe robinet roche roi roue ruban ruche rue sable sac salade sapin savon seau serpent serviette singe sirop soleil sorcière soupe sourire souris stylo sucre table tableau tablier tambour tapis tasse téléphone tente terre tête thé tigre tiroir toboggan toit tomate tonneau torchon tortue tour train trésor tricot trompette trottoir tulipe tuyau usine vache valise vélo vent verre veste village ville violon voile voiture wagon yaourt zèbre
+# plus de verbes
+accrocher acheter allumer appeler applaudir arroser attraper balayer bâtir boutonner bricoler cacher caresser casser chatouiller chuchoter coller colorier construire coudre couper courir crier cueillir découper décorer déménager dessiner deviner disputer éclabousser effacer embrasser emporter enlever éternuer éteindre expliquer fabriquer frapper glisser goûter gratter habiller jardiner lancer lécher marcher mélanger mesurer mordre nettoyer nourrir oublier pédaler peigner pêcher planter plier porter pousser préparer promener ramasser ranger raconter remplir réparer respirer rêver ronfler rouler secouer siffler souffler sourire tirer tomber tourner traverser tricoter trouver vider voyager
+# plus d'adjectifs
+beau belle bon bonne mauvais chaud froid clair foncé doux amer acide rapide lent lourd léger mouillé sec propre sale neuf ancien jeune vieux calme bruyant gentil méchant poli timide courageux curieux heureux heureuse malheureux fier fière gourmand gourmande coquin sage rigolo rigolote magnifique minuscule énorme géant pointu rond carré plat bleu bleue vert verte gris grise noir noire blanc blanche violet violette

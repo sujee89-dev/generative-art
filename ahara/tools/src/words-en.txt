@@ -1,0 +1,94 @@
+# One or more words per line. Use | to force a syllable split, e.g. home|work
+# short a
+bat cat hat mat rat sat fat pat vat cab dab jab lab tab bad dad had lad mad pad sad tad bag rag tag wag nag ham jam ram yam dam can fan man pan ran tan van cap gap lap map nap rap sap tap zap yap has at an am ax wax max tax fax
+# short e
+bed fed led red wed beg leg peg hen men pen ten den yes bet get jet let met net pet set vet wet yet web gem hem less mess bell fell sell tell well yell neck deck egg elf end
+# short i
+bib rib fib bid did hid kid lid rid big dig fig pig wig jig dim him rim bin fin pin tin win dip hip lip rip sip tip zip bit fit hit kit pit sit fix mix six if in it is ill inch itch
+# short o
+cob job mob rob sob nod pod rod dog fog hog jog log hop mop pop top cot dot got hot jot lot not pot box fox ox mom on off odd
+# short u
+cub rub sub tub bud mud dug bug hug jug mug rug tug gum hum sum yum bun fun run sun cup pup up but cut hut nut bus us
+# digraphs
+ship shop shed shell shelf fish dish wish cash rush brush crash splash chip chin chop chat chest much lunch bench rich thin thick bath math moth with this that then them than duck luck back pack sack rock sock kick sick pick lick lock clock black snack truck quack quick quilt queen whip when which whale wheel phone graph
+# blends
+frog flag flat flip flop clap clip club crab crib drum drip dress grab grin grass glad glass plan plum plus slip slid sled snap sniff spot spin spill step stop still stick swim swing trip trap twin skip skin skunk stamp stump jump bump lump pump camp lamp damp hand band land sand pond bend send tent went nest best rest test vest west milk silk belt melt help gift left soft lost fast last past mask desk list mist fist blob bless blink brick bring cliff crop drop flash fresh from frost glob grip plant plop press prize print scrap scrub sled slam smell snug spell splat sprint strap string strong swept think thank trunk twist
+# magic e
+cake bake lake make rake take wake game name same came gate late plate skate shake snake shape cave gave wave save hide ride side wide bike like hike kite bite white time lime dime nine fine line pine mine five hive dive smile slide rope hope home bone cone stone nose rose hole pole joke woke note vote cube cute tube tune rule mule flute huge
+# vowel teams
+rain train paint mail tail snail wait day play say way stay tray clay pray bee see tree free green queen sleep sheep feet street seed need feed beep deep jeep keep week tea sea pea read eat beat meat seat leaf team bead bean clean dream cream boat coat goat road toad soap loaf snow grow show slow blow bow low row glow moon soon spoon food cool pool zoo boot room broom tooth moose book look cook good wood foot hook took wool car star far jar park dark farm arm yard bark barn card cart shark corn horn fork storm short sport born north bird girl first shirt third fur turn burn hurt cow now how wow brown down town clown crown owl growl house mouse out shout cloud loud round sound ground count mouth south boy toy joy enjoy oil coin boil point soil noise saw paw draw straw law claw yawn launch sauce new few blew chew grew stew true blue glue clue
+# sight words
+the a and is it in to you he she we me my I was said of for on are they with his her have from what where when who why this there here come some one two three four go see look run jump play find big little funny help make up down away all am ate be but came did do eat get good into like must no now our out please pretty ride saw say soon too under want well went will yes after again any as ask by could every fly give going had how just know let live may old once open over put round stop take thank then think walk were always around because been before both buy call cold does fast first found gave goes its made many or pull right sing sit tell their these those upon use very wash would write your about better bring carry done drink fall full hold keep kind laugh light long myself never only own pick shall small start today together try warm
+# family and people
+mom dad mama papa baby sister brother grandma grandpa aunt uncle cousin family friend teacher doctor nurse farmer baker cook pilot driver king queen prince princess boy girl man woman child children people neighbor
+# body
+head hair face eye eyes ear nose mouth lip lips tooth teeth tongue chin cheek neck arm arms hand hands finger fingers thumb nail leg legs knee foot feet toe toes back belly heart brain skin bone
+# home
+house home room bed door window wall floor roof chair table sofa lamp rug clock cup plate bowl spoon fork pot pan oven sink bath towel soap brush comb mirror pillow blanket stairs garden gate fence yard kitchen bedroom bathroom
+# school
+school class book books pen pencil paper crayon glue desk bag chalk board map ruler eraser lesson reading writing story letter number word page picture paint music recess lunchbox playground
+# food
+apple banana grape grapes orange lemon lime melon mango peach pear plum cherry berry kiwi coconut pineapple strawberry watermelon tomato potato carrot pea peas bean beans corn onion pepper pumpkin salad soup bread toast butter cheese egg eggs milk juice water tea rice pasta noodles pizza cake cookie candy honey jam sugar salt snack lunch dinner breakfast sandwich pancake muffin cupcake popcorn yogurt cereal
+# animals
+cat dog pig cow hen fox bat rat ant bee bug owl duck frog fish bird goat sheep horse mouse lion tiger bear wolf deer seal whale shark crab snail snake worm moth lamb calf pony puppy kitten bunny rabbit chick monkey zebra camel panda koala otter parrot penguin turtle spider beetle dolphin donkey giraffe hippo rhino gorilla leopard cheetah elephant squirrel hamster peacock octopus lizard kangaroo dinosaur butterfly caterpillar crocodile alligator flamingo hedgehog ladybug jellyfish goldfish
+# nature
+sun moon star sky cloud rain snow wind storm rainbow tree leaf leaves flower grass seed root plant rock stone sand hill mountain river lake pond sea ocean beach island forest jungle desert cave wave shell nest egg log mud puddle ice fire smoke earth world planet space
+# colors and shapes
+red blue green yellow orange purple pink brown black white gray gold silver color circle square triangle star heart oval line dot shape
+# numbers
+one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty hundred first second third last half zero
+# time
+day night morning noon evening today tomorrow yesterday week month year spring summer fall winter
+Monday Tuesday Wednesday Thursday Friday Saturday Sunday
+January February March April May June July August September October November December
+# weather
+sunny rainy windy cloudy snowy stormy foggy hot cold warm cool
+# clothes
+hat cap coat dress shirt skirt sock socks shoe shoes boot boots pants shorts jacket sweater scarf mitten mittens glove gloves belt button zipper pocket pajamas
+# toys and play
+ball doll kite toy toys block blocks puzzle game drum bike swing slide sled balloon bubble bubbles crayon teddy robot rocket train truck boat yo-yo
+# vehicles and places
+car bus van jeep taxi truck train plane jet ship boat rocket tractor bicycle scooter helicopter subway road street bridge park farm zoo shop store market city town village library museum hospital airport station castle tent
+# verbs
+run jump hop skip walk talk sing dance swim climb read write draw paint cook bake eat drink sleep wake smile laugh cry clap wave kick throw catch push pull open close look listen think play share help hug kiss wash brush build dig fly ride drive sit stand fall hide seek count spell color cut fold rest dream wish love like want need find lose win bring give take make see hear feel smell taste touch go come stop wait look watch learn teach grow
+# describing words
+happy sad mad glad big small tall short long fast slow hot cold warm cool wet dry soft hard loud quiet clean dirty new old young kind nice funny silly brave shy busy sleepy hungry thirsty tired full empty bright dark light heavy round square sweet sour salty fluffy tiny huge pretty little great good bad best
+# longer words
+animal apple|tree basket button candle circle dragon finger flower jacket ladder letter market mother father number paper pencil picnic pillow pocket rabbit river robot seven silver spider summer table tiger turtle under water window winter yellow zebra zipper
+banana umbrella tomato potato bicycle computer holiday library octopus strawberry watermelon grandmother grandfather birthday rainbow snowman sunshine sandwich backpack notebook
+morning evening afternoon happy|birthday wonderful beautiful family together everyone somebody something anything nothing inside outside upstairs downstairs forever
+home|work sun|flower butter|fly foot|ball base|ball bed|time day|time sun|set sun|rise gold|fish star|fish sea|shell rain|coat hand|bag tooth|brush cup|cake pan|cake pop|corn snow|ball snow|flake fire|fly fire|man lady|bug
+elephant kangaroo dinosaur crocodile alligator caterpillar helicopter hamburger lemonade telephone television spaghetti macaroni tomorrow yesterday adventure astronaut calendar camera cucumber dinosaur envelope fantastic hospital important invitation magazine medicine microphone newspaper pajamas pineapple president principal radio sunglasses tornado vacation vegetable video volcano
+# word families
+fat vat chat flat splat that brat scat spat sprat
+can fan man pan plan scan span than bran clan
+big dig fig jig pig rig wig twig swig
+hop mop pop top shop chop drop flop plop prop stop crop
+bug dug hug jug mug rug tug slug plug snug shrug
+bell cell fell sell shell smell spell swell tell well yell dwell
+king ring sing wing thing sting swing bring spring string
+light night right sight tight bright flight might fright slight
+cook book hook look took brook crook shook
+day hay may pay ray say way clay gray play pray spray stay tray
+ball call fall hall mall tall wall small stall
+cake bake fake lake make rake take wake flake snake shake
+sip dip hip lip rip tip zip chip ship skip slip trip drip flip grip whip
+bet get jet let met net pet set wet yet
+hot cot dot got lot not pot rot shot spot knot plot slot
+fun bun run sun spun stun
+bank tank sank thank blank drank plank prank crank
+sink pink wink link think blink drink stink
+# more nouns
+ant axe bag bin bow bun cap cob cod cub den dew dip elk ewe fin gum hay hen hog hut ink inn jar jaw keg kid kit lid log mat mop net nut oak oar orb owl pad pan paw pea peg pen pie pin pit pod pot pup ram rat rim rod rug saw sip sod sun tab tag tap tin toe tub urn van vat vet wig yak yam
+anchor apron arrow badge barrel beard bench blanket blossom bottle bracelet branch bubble bucket cabin camp candle canoe carpet castle chain chalk cherry chimney clover collar corner cottage cradle crayon curtain cushion daisy desert diamond dinner ditch dolphin donkey drawer eagle engine feather fence fiddle flag fountain frame gate glove goose gravel guitar hammer harbor helmet hive hoop igloo island jacket jelly jewel kettle kitchen knight knob label lantern lemon lettuce lighthouse lizard locket magnet marble meadow medal melon mitten muffin nail napkin needle nickel noodle orchard ostrich oven owl paddle palace parade parcel pebble pepper pickle pigeon pirate pitcher planet puddle quilt raccoon raft ribbon rocket saddle sailor scarf seesaw shovel sock spider sponge squirrel stable stamp statue stool sunflower swan sweater teapot tiger tower tractor treasure trumpet tulip tunnel turkey valley vase violin wagon wallet whistle wizard wolf yarn
+# more verbs
+add bake bark beg bend bite blow boil bounce bow buzz chase cheer chew chop clean climb comb crawl cross cut dig dive dream dress drip drop dust fetch fill find fix float fold follow gallop giggle glow grab grin growl guess hammer hatch hide hike hold hop hum hunt hurry jog juggle kneel knit knock land leap lick lift march melt mix nap nod pack paddle pat peek pet pinch plant pour pray press print race rake reach roar roll row rub sail scoop scrub sew shake share shout shovel shut sip skate ski slide smile sneeze sniff snore splash spin squeeze stamp stir stretch sweep swing tap tickle tiptoe toss trace travel trot tug twirl type visit wag wander wiggle wink wipe yawn zoom
+# -ing and -ed words
+jumping running hopping singing reading playing eating sleeping swimming dancing painting cooking baking walking talking looking helping laughing smiling crying
+jumped played walked talked looked helped laughed smiled cooked baked painted opened closed wanted needed
+# plurals
+cats dogs pigs hens ducks frogs fish birds bees ants bugs cows sheep goats horses mice lions tigers bears wolves foxes boxes buses dishes wishes glasses dresses babies puppies kittens bunnies ponies berries cherries leaves wives knives feet teeth geese men women children
+# more describing words
+angry bumpy busy calm cheerful chilly clever cozy crunchy curly cute dizzy eager early fancy fierce fluffy foggy fresh friendly fuzzy gentle giant golden gooey grumpy hairy helpful honest icy jolly juicy late lazy lively lonely lovely lucky messy mighty muddy narrow neat noisy perfect plain polite proud quick rainy rich rough rusty scary shiny sharp shiny silent simple skinny slimy slippery smart smooth snowy sore sparkly spicy spotty sticky stormy strange strong sunny super tasty thick thin tidy tough tricky ugly warm weak wild windy wise wobbly wooden woolly worried yummy zany
+# question and joining words
+who what where when why how which whose because but and or so if then than also very really only even still just almost always sometimes never often maybe
