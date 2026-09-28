@@ -3,3 +3,6 @@ __pycache__/
 trades.jsonl
 .env
 positions.json
+
+# Your personal answers from brain/interview.md: kept on your machine, never pushed (the repo is public).
+brain/private/

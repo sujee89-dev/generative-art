@@ -6,6 +6,12 @@ import math
 import threading
 
 
+def format_trade(result):
+    price = result.get("price")
+    at = f" @ {price:,.2f}" if isinstance(price, (int, float)) else ""
+    return f"{result.get('side', '?').upper()} {result.get('qty')} {result.get('symbol')}{at}"
+
+
 class Rejected(Exception):
     """Alert was refused; the message says why."""
 
@@ -26,6 +32,8 @@ class TradingEngine:
         self._trades_today = 0
         self.halted_reason = None
         self.auto_status = None  # last AutoTrader check, shown on /status
+        self.paused = False  # set by Telegram /pause; blocks buys only, resets on restart
+        self.notify = lambda text: None  # replaced by TelegramBot.notify when Telegram is set up
 
     def handle_alert(self, payload):
         """Validate and act on one alert. Returns a dict describing what happened."""
@@ -65,9 +73,13 @@ class TradingEngine:
                 result = self.broker.close(symbol, price)
                 result = result or {"symbol": symbol, "side": "sell", "qty": 0, "note": "no open position"}
             self._journal(result)
+            if result.get("qty"):
+                self.notify(format_trade(result))
             return result
 
     def _buy(self, symbol, price, crypto):
+        if self.paused:
+            raise Rejected("trading paused (Telegram /resume to allow buys)", status=409)
         if self.halted_reason:
             raise Rejected(f"trading halted: {self.halted_reason}", status=409)
         if self._trades_today >= self.cfg.max_trades_per_day:
@@ -109,5 +121,6 @@ class TradingEngine:
                 "day_start_equity": self._day_start_equity,
                 "trades_today": self._trades_today,
                 "halted": self.halted_reason,
+                "paused": self.paused,
                 "auto_trader": self.auto_status,
             }

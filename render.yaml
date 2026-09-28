@@ -37,6 +37,11 @@ services:
         value: /data/trades.jsonl
       - key: STATE_PATH
         value: /data/positions.json
+      # Optional phone alerts and /status, /pause, /resume (trading-bot/README.md, "Phone control").
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
       - key: KRAKEN_KEY
         sync: false
       - key: KRAKEN_SECRET

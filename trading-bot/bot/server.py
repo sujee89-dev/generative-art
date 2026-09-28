@@ -10,6 +10,7 @@ from .autotrader import AutoTrader
 from .brokers import AlpacaBroker, BinanceBroker, BrokerError, KrakenBroker, PaperBroker
 from .config import Config
 from .engine import Rejected, TradingEngine
+from .telegram import TelegramBot
 
 log = logging.getLogger("trading-bot")
 MAX_BODY = 4096
@@ -77,6 +78,11 @@ def main():
     engine = build_engine(cfg)
     mode = "LIVE MONEY" if (cfg.broker != "paper" and cfg.live_trading) else "paper/simulated"
     log.info("broker=%s mode=%s listening on :%d", cfg.broker, mode, cfg.port)
+    if cfg.telegram_bot_token:
+        telegram = TelegramBot(cfg.telegram_bot_token, cfg.telegram_chat_id, engine)
+        engine.notify = telegram.notify
+        telegram.start()
+        telegram.notify(f"Trading bot started: broker={cfg.broker}, mode={mode}")
     if cfg.auto_trade_symbol:
         AutoTrader(engine, cfg.auto_trade_symbol, cfg.trend_sma, cfg.trend_exit_buffer_pct / 100,
                    cfg.auto_check_minutes * 60).start()

@@ -68,6 +68,8 @@ class AutoTrader:
             candles = self._fetch(self.symbol)
         except BrokerError as e:
             log.error("auto-trader: %s", e)
+            if not (self.engine.auto_status or {}).get("error"):  # alert once, not every hour
+                self.engine.notify(f"Auto-trader can't read the chart: {e}")
             self.engine.auto_status = {"checked_at": now, "error": str(e)}
             return None
         candle_time, close = candles[-1]
@@ -91,10 +93,12 @@ class AutoTrader:
                 log.info("auto-trader %s: %s", action, result)
             except Rejected as e:
                 log.error("auto-trader %s refused: %s", action, e)
+                self.engine.notify(f"Auto-trader {action} signal refused: {e}")
                 status["error"] = str(e)
             except BrokerError as e:
                 # Probably temporary (network, exchange): retry at the next check.
                 log.error("auto-trader %s failed, will retry: %s", action, e)
+                self.engine.notify(f"Auto-trader {action} failed, will retry next check: {e}")
                 status["error"] = str(e)
                 self.engine.auto_status = status
                 return None

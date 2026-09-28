@@ -16,6 +16,7 @@ from bot.autotrader import AutoTrader, fetch_kraken_daily_candles, trend_signal
 from bot.config import Config
 from bot.engine import Rejected, TradingEngine
 from bot.server import make_handler
+from bot.telegram import TelegramBot
 
 SECRET = "test-secret-123456"
 
@@ -249,6 +250,65 @@ class AutoTraderTests(unittest.TestCase):
             raise BrokerError("Kraken down")
         AutoTrader(engine, "BTCCAD", fetch=boom).check()
         self.assertEqual(engine.status()["auto_trader"]["error"], "Kraken down")
+
+
+class TelegramTests(unittest.TestCase):
+    def setUp(self):
+        self.engine, _ = make_engine(max_position_usd=1000)
+        self.sent = []
+        self.http = FakeHTTP({("POST", "/botTOKEN/sendMessage"): lambda: self._record()})
+        self.bot = TelegramBot("TOKEN", "42", self.engine, opener=self.http)
+
+    def _record(self):
+        self.sent.append(json.loads(self.http.requests[-1][3]))
+        return {"ok": True, "result": {}}
+
+    def msg(self, text, chat=42):
+        return {"update_id": 1, "message": {"chat": {"id": chat}, "text": text}}
+
+    def test_pause_blocks_buys_but_not_sells(self):
+        self.engine.handle_alert(alert("buy", 100))
+        self.assertIn("Paused", self.bot.handle(self.msg("/pause")))
+        with self.assertRaises(Rejected):
+            self.engine.handle_alert(alert("buy", 100, symbol="MSFT"))
+        self.assertEqual(self.engine.handle_alert(alert("sell", 100))["qty"], 10)
+        self.assertTrue(self.engine.status()["paused"])
+        self.bot.handle(self.msg("/resume@my_trading_bot"))
+        self.assertEqual(self.engine.handle_alert(alert("buy", 100, symbol="MSFT"))["qty"], 10)
+
+    def test_status_and_help(self):
+        self.engine.handle_alert(alert("buy", 100))
+        self.assertIn("Trades today: 1", self.bot.handle(self.msg("/status")))
+        self.assertIn("/pause", self.bot.handle(self.msg("hello")))
+
+    def test_ignores_other_chats(self):
+        self.assertIsNone(self.bot.handle(self.msg("/pause", chat=666)))
+        self.assertFalse(self.engine.paused)
+
+    def test_without_chat_id_only_reveals_chat_id(self):
+        bot = TelegramBot("TOKEN", "", self.engine, opener=self.http)
+        self.assertIn("TELEGRAM_CHAT_ID=7", bot.handle(self.msg("/pause", chat=7)))
+        self.assertFalse(self.engine.paused)
+
+    def test_poll_replies_and_advances_offset(self):
+        self.http.routes[("POST", "/botTOKEN/getUpdates")] = {"ok": True, "result": [dict(self.msg("/status"), update_id=5)]}
+        self.bot.poll_once()
+        self.assertEqual(self.sent[0]["chat_id"], 42)
+        self.assertIn("Equity", self.sent[0]["text"])
+        self.bot.poll_once()
+        self.assertEqual(json.loads(self.http.requests[-2][3])["offset"], 6)
+
+    def test_trades_are_notified(self):
+        notes = []
+        self.engine.notify = notes.append
+        self.engine.handle_alert(alert("buy", 100))
+        self.engine.handle_alert(alert("buy", 100))  # already in position: no trade, no alert
+        self.assertEqual(notes, ["BUY 10 AAPL @ 100.00"])
+
+    def test_send_failure_does_not_raise(self):
+        def down(req, timeout=None):
+            raise urllib.error.URLError("offline")
+        TelegramBot("TOKEN", "42", self.engine, opener=down).send("hi")
 
 
 class ConfigTests(unittest.TestCase):

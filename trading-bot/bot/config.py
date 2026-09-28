@@ -34,6 +34,9 @@ class Config:
     trend_sma: int = 200
     trend_exit_buffer_pct: float = 3.0
     auto_check_minutes: int = 60
+    # Telegram: trade alerts and /status, /pause, /resume from your phone. Empty token = off.
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
 
     @classmethod
     def from_env(cls, env=os.environ):
@@ -62,6 +65,8 @@ class Config:
             trend_sma=int(env.get("TREND_SMA", 200)),
             trend_exit_buffer_pct=float(env.get("TREND_EXIT_BUFFER_PCT", 3)),
             auto_check_minutes=int(env.get("AUTO_CHECK_MINUTES", 60)),
+            telegram_bot_token=env.get("TELEGRAM_BOT_TOKEN", "").strip(),
+            telegram_chat_id=env.get("TELEGRAM_CHAT_ID", "").strip(),
         )
         # Real money only when explicitly requested.
         cfg.alpaca_base_url = ALPACA_LIVE_URL if cfg.live_trading else ALPACA_PAPER_URL

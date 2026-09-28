@@ -81,6 +81,30 @@ Unlike the backtest, which compounds 95% of the account, the bot spends a fixed
 lives in memory, so after a restart the bot is flat and simply buys again at the next check if
 the trend is still up.
 
+## Second brain: your rules and goals for Claude
+
+`brain/` holds your trading rules, strategy and goals as Markdown, so Claude has full context
+every time you work on the bot (`CLAUDE.md` tells Claude Code to read it first). The rules and
+strategy files are already filled in from what the code does; a 30-question interview fills in
+the rest. Start with `brain/README.md`. Personal and financial answers go in `brain/private/`,
+which git ignores, because this repository is public.
+
+## Phone control (Telegram)
+
+The bot can message you on every trade and when something goes wrong, and answers `/status`,
+`/pause` (stop new buys; sells still go through) and `/resume`. It runs on the server, so
+nothing needs to stay on at home.
+
+1. In Telegram, search for **@BotFather**, send `/newbot` and follow the steps. It gives you a
+   token like `123456:ABC...`. Treat it like a password.
+2. In Render → Environment, set `TELEGRAM_BOT_TOKEN` to that token.
+3. Send your new bot any message. It replies with your chat id.
+4. Set `TELEGRAM_CHAT_ID` to that number. From then on, only your chat can use the commands;
+   messages from anyone else are ignored.
+
+`/pause` lasts until `/resume` or a restart (a redeploy starts unpaused). It can't place trades;
+the bot still only trades on its own signals.
+
 ## Risk controls (enforced by the bot, whatever the alert says)
 
 | Setting | Default | What it does |
@@ -89,6 +113,7 @@ the trend is still up.
 | `MAX_DAILY_LOSS_USD` | 200 | Stops new buys for the rest of the day once equity falls this much |
 | `MAX_TRADES_PER_DAY` | 10 | Maximum buys per day |
 | `ALLOWED_SYMBOLS` | *(any)* | Comma-separated whitelist, e.g. `SPY,AAPL` |
+| Telegram `/pause` | off | Stops new buys until `/resume` |
 
 Sells that close a position are always allowed, even after trading is halted. The bot won't buy
 a symbol it already holds, alerts need the shared secret, and every trade is appended to
@@ -206,8 +231,10 @@ cd trading-bot && python -m unittest discover -s tests -t .
 
 - `bot/autotrader.py`: reads Kraken's daily chart and trades Trend (200 SMA) without TradingView.
 - `bot/server.py`: HTTP server with `POST /webhook`, `GET /status` and `GET /health`.
+- `bot/telegram.py`: trade alerts and `/status`, `/pause`, `/resume` on Telegram.
 - `bot/engine.py`: alert validation, risk limits and the trade journal.
 - `bot/brokers.py`: `PaperBroker` (the simulator), `AlpacaBroker`, `BinanceBroker` and `KrakenBroker`.
 - `bot/config.py`: settings read from environment variables.
 - `pine/trend_breakout_strategy.pine`, `pine/ema_rsi_strategy.pine`: the TradingView strategies that generate the signals.
+- `brain/`: the second brain (rules, strategy, interview); `CLAUDE.md` points Claude to it.
 - `Dockerfile`, `../render.yaml`: deployment.
