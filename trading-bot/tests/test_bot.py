@@ -12,6 +12,7 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 
 from bot.brokers import BrokerError, AlpacaBroker, BinanceBroker, KrakenBroker, PaperBroker, split_pair
+from bot.autotrader import AutoTrader, fetch_kraken_daily_candles, trend_signal
 from bot.config import Config
 from bot.engine import Rejected, TradingEngine
 from bot.server import make_handler
@@ -201,6 +202,55 @@ class KrakenTests(unittest.TestCase):
         self.assertLess(int(nonces[0]), int(nonces[1]))
 
 
+class AutoTraderTests(unittest.TestCase):
+    def test_trend_signal(self):
+        flat = [100.0] * 200
+        self.assertEqual(trend_signal(flat[:-1] + [101], holding=False), ("buy", 100.005))
+        self.assertEqual(trend_signal(flat[:-1] + [101], holding=True)[0], None)
+        self.assertEqual(trend_signal(flat[:-1] + [98], holding=True)[0], None)  # inside 3% buffer
+        self.assertEqual(trend_signal(flat[:-1] + [90], holding=True)[0], "sell")
+        self.assertEqual(trend_signal(flat[:-1] + [90], holding=False)[0], None)
+        self.assertEqual(trend_signal([100.0] * 50, holding=False), (None, None))  # not enough history
+
+    def test_fetch_drops_unfinished_candle(self):
+        http = FakeHTTP({("GET", "/0/public/OHLC"): {"error": [], "result": {
+            "XXBTZCAD": [[86400, "1", "1", "1", "100.5", "1", "1", 1],
+                         [172800, "1", "1", "1", "101.5", "1", "1", 1],
+                         [259200, "1", "1", "1", "999", "1", "1", 1]],
+            "last": 172800}}})
+        self.assertEqual(fetch_kraken_daily_candles("BTCCAD", opener=http), [(86400, 100.5), (172800, 101.5)])
+        self.assertEqual(http.requests[0][2], {"pair": ["XBTCAD"], "interval": ["1440"]})
+
+    def test_buys_then_sells_once_per_candle(self):
+        engine, _ = make_engine(max_position_usd=1000)
+        candles = [(i * 86400, 100.0) for i in range(199)] + [(199 * 86400, 110.0)]
+        trader = AutoTrader(engine, "BTCCAD", fetch=lambda s: candles)
+        self.assertEqual(trader.check()["side"], "buy")
+        self.assertIsNone(trader.check())  # same candle: nothing more to do
+        self.assertEqual(engine.auto_status["signal"], "buy")
+        candles.append((200 * 86400, 80.0))  # next day closes well below the SMA
+        self.assertEqual(trader.check()["side"], "sell")
+        self.assertEqual(engine.broker.position_qty("BTCCAD"), 0)
+
+    def test_broker_failure_retries_same_candle(self):
+        engine, _ = make_engine()
+        candles = [(i * 86400, 100.0) for i in range(199)] + [(199 * 86400, 110.0)]
+        trader = AutoTrader(engine, "BTCCAD", fetch=lambda s: candles)
+        real_buy = engine.broker.buy
+        engine.broker.buy = lambda *a, **k: (_ for _ in ()).throw(BrokerError("timeout"))
+        self.assertIsNone(trader.check())
+        self.assertIn("timeout", engine.auto_status["error"])
+        engine.broker.buy = real_buy
+        self.assertEqual(trader.check()["side"], "buy")
+
+    def test_fetch_error_is_reported(self):
+        engine, _ = make_engine()
+        def boom(symbol):
+            raise BrokerError("Kraken down")
+        AutoTrader(engine, "BTCCAD", fetch=boom).check()
+        self.assertEqual(engine.status()["auto_trader"]["error"], "Kraken down")
+
+
 class ConfigTests(unittest.TestCase):
     def test_requires_secret(self):
         with self.assertRaises(ValueError):
@@ -216,6 +266,13 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no practice mode"):
             Config.from_env(env)
         self.assertEqual(Config.from_env(dict(env, LIVE_TRADING="true")).broker, "kraken")
+
+    def test_auto_trade_settings(self):
+        env = {"WEBHOOK_SECRET": SECRET, "AUTO_TRADE_SYMBOL": " btccad "}
+        cfg = Config.from_env(env)
+        self.assertEqual((cfg.auto_trade_symbol, cfg.trend_sma, cfg.trend_exit_buffer_pct), ("BTCCAD", 200, 3.0))
+        with self.assertRaisesRegex(ValueError, "AUTO_TRADE_SYMBOL"):
+            Config.from_env(dict(env, BROKER="alpaca", ALPACA_KEY="k", ALPACA_SECRET="s"))
 
     def test_binance_testnet_unless_live(self):
         env = {"WEBHOOK_SECRET": SECRET, "BROKER": "binance", "BINANCE_KEY": "k", "BINANCE_SECRET": "s"}

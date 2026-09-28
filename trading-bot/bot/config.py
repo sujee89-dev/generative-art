@@ -29,6 +29,11 @@ class Config:
     journal_path: str = "trades.jsonl"
     state_path: str = "positions.json"
     port: int = 8080
+    # AutoTrader: read the daily Kraken chart and trade Trend (200 SMA) without TradingView.
+    auto_trade_symbol: str = ""  # e.g. "BTCCAD"; empty = off (webhooks only)
+    trend_sma: int = 200
+    trend_exit_buffer_pct: float = 3.0
+    auto_check_minutes: int = 60
 
     @classmethod
     def from_env(cls, env=os.environ):
@@ -53,6 +58,10 @@ class Config:
             journal_path=env.get("JOURNAL_PATH", "trades.jsonl"),
             state_path=env.get("STATE_PATH", "positions.json"),
             port=int(env.get("PORT", 8080)),
+            auto_trade_symbol=env.get("AUTO_TRADE_SYMBOL", "").strip().upper(),
+            trend_sma=int(env.get("TREND_SMA", 200)),
+            trend_exit_buffer_pct=float(env.get("TREND_EXIT_BUFFER_PCT", 3)),
+            auto_check_minutes=int(env.get("AUTO_CHECK_MINUTES", 60)),
         )
         # Real money only when explicitly requested.
         cfg.alpaca_base_url = ALPACA_LIVE_URL if cfg.live_trading else ALPACA_PAPER_URL
@@ -63,6 +72,8 @@ class Config:
             raise ValueError("ALPACA_KEY and ALPACA_SECRET are required when BROKER=alpaca")
         if cfg.broker == "binance" and not (cfg.binance_key and cfg.binance_secret):
             raise ValueError("BINANCE_KEY and BINANCE_SECRET are required when BROKER=binance")
+        if cfg.auto_trade_symbol and cfg.broker not in ("paper", "kraken"):
+            raise ValueError("AUTO_TRADE_SYMBOL reads Kraken's chart; use it with BROKER=paper or kraken")
         if cfg.broker == "kraken":
             if not (cfg.kraken_key and cfg.kraken_secret):
                 raise ValueError("KRAKEN_KEY and KRAKEN_SECRET are required when BROKER=kraken")
