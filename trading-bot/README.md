@@ -116,6 +116,30 @@ Caveats:
   are all `sync: false` there, so a Blueprint sync never overwrites values you set in the
   dashboard. Turning Blueprint **Auto Sync** off is still the safest option.
 
+## Covered calls (stock bot, paper first)
+
+Set `COVERED_CALL_SYMBOLS` (e.g. `NVDA`; each must also be in `STOCK_SYMBOLS`) and, hourly during
+market hours, the bot sells covered calls on shares the trend bot holds:
+
+1. **Tops up to 100 shares,** one contract's worth, if 100 shares cost no more than
+   `CC_MAX_SHARES_USD` (default 30000).
+2. **Sells one call per 100 shares:**
+   - **Expiry:** closest to `CC_TARGET_DTE` days (35), between `CC_MIN_DTE` (21) and `CC_MAX_DTE` (49).
+   - **Strike:** the lowest one at least `CC_OTM_PCT` (10%) above the last close.
+   - **Order:** a limit order at the bid/ask midpoint. Unfilled orders are cancelled and retried
+     at the next check.
+3. **After expiry,** it sells the next call.
+4. **If the call is assigned,** the shares are called away. The bot notices, updates its records,
+   and the trend rule may buy back in.
+5. **Before a trend sell,** it buys the call back first. If that fails, the shares aren't sold,
+   so a call is never left uncovered.
+
+Quotes use IBKR's free delayed data when you have no options data subscription. Your account
+(paper follows live) needs options trading permission for covered calls. Sold calls are tracked in
+`CC_STATE_PATH`, and `/status` shows them under `stocks.auto_trader["<SYMBOL> calls"]`. Covered
+calls cap your upside: if the stock jumps more than about 10% in a month, you keep the premium but
+miss the rest of the rise.
+
 ## Risk controls (enforced by the bot, whatever the alert says)
 
 | Setting | Default | What it does |
@@ -240,7 +264,8 @@ cd trading-bot && python -m unittest discover -s tests -t .
 
 ## Files
 
-- `bot/ibkr.py`: Interactive Brokers stocks through IB Gateway (ib_async).
+- `bot/ibkr.py`: Interactive Brokers stocks and options through IB Gateway (ib_async).
+- `bot/covered_calls.py`: sells and manages covered calls on held stocks.
 - `bot/stockdata.py`: free daily US stock prices (Stooq, Yahoo fallback) and market hours.
 - `bot/autotrader.py`: reads Kraken's daily chart and trades Trend (200 SMA) without TradingView.
 - `bot/server.py`: HTTP server with `POST /webhook`, `GET /status` and `GET /health`.

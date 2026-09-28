@@ -14,6 +14,7 @@ from http.server import ThreadingHTTPServer
 from bot.brokers import BrokerError, AlpacaBroker, BinanceBroker, KrakenBroker, PaperBroker, split_pair
 from bot.autotrader import AutoTrader, fetch_kraken_daily_candles, trend_signal
 from bot.config import Config
+from bot.covered_calls import CoveredCallManager, limit_price, pick_expiry, pick_strike
 from bot.ibkr import IBKRBroker
 from bot.server import safe_status
 from bot.stockdata import fetch_stock_daily_candles, us_market_open
@@ -285,6 +286,32 @@ class FakeGateway:
         return len(self.orders), filled, 500.0
 
 
+class FakeOptionsGateway(FakeGateway):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.calls = {}  # (expiry, strike) -> contracts short
+        self.call_fill = None  # None = fill everything
+        self.quote = (4.00, 4.40)
+
+    def call_chain(self, symbol):
+        return ["20261016", "20261030", "20261120", "20261218"], [220.0, 240.0, 250.0, 255.0, 260.0]
+
+    def call_quote(self, symbol, expiry, strike):
+        return self.quote
+
+    def call_order(self, symbol, expiry, strike, side, qty, limit=None):
+        filled = qty if self.call_fill is None else self.call_fill
+        self.orders.append((symbol, f"{side} CALL {expiry} {strike}", qty))
+        key = (expiry, float(strike))
+        self.calls[key] = self.calls.get(key, 0) + (filled if side == "SELL" else -filled)
+        if self.calls[key] <= 0:
+            del self.calls[key]
+        return len(self.orders), filled, limit or 4.5
+
+    def short_calls(self, symbol):
+        return dict(self.calls)
+
+
 def ny(y, m, d, hh, mm):
     from zoneinfo import ZoneInfo
     return dt.datetime(y, m, d, hh, mm, tzinfo=ZoneInfo("America/New_York"))
@@ -368,6 +395,77 @@ class StockTests(unittest.TestCase):
         self.assertIn("ConnectionRefused", safe_status(engine)["error"])
 
 
+class CoveredCallTests(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.mkdtemp()
+        self.engine, _ = make_engine(max_position_usd=1000)
+        self.gw = FakeOptionsGateway()
+        self.engine.broker = IBKRBroker(self.gw, os.path.join(d, "stocks.json"))
+        self.engine.broker.buy("NVDA", 4, 231.0)  # what the trend bot bought
+        self.engine.broker.mark("NVDA", 225.0)
+        self.state = os.path.join(d, "calls.json")
+        self.cc = self.manager()
+
+    def manager(self, **kw):
+        kw.setdefault("market_open", lambda: True)
+        kw.setdefault("today", lambda: dt.date(2026, 9, 28))
+        return CoveredCallManager(self.engine, ["NVDA"], self.state, **kw)
+
+    def test_picking_helpers(self):
+        self.assertEqual(pick_expiry(["20261016", "20261030", "20261120"], dt.date(2026, 9, 28)), "20261030")
+        self.assertIsNone(pick_expiry(["20261002"], dt.date(2026, 9, 28)))
+        self.assertEqual(pick_strike([240.0, 247.5, 250.0], 225.0), 250.0)  # >= 247.5
+        self.assertEqual(limit_price(4.00, 4.40), 4.2)
+        self.assertEqual(limit_price(0.52, 0.57), 0.54)
+
+    def test_tops_up_to_100_then_sells_one_call(self):
+        self.cc.check()
+        self.assertEqual(self.engine.broker.position_qty("NVDA"), 100)
+        self.assertIn(("NVDA", "BUY", 96), self.gw.orders)
+        self.assertIn(("NVDA", "SELL CALL 20261030 250.0", 1), self.gw.orders)
+        self.assertEqual(self.cc.calls["NVDA"][0]["strike"], 250.0)
+        orders = len(self.gw.orders)
+        self.manager().check()  # restarted: remembers the call, sells nothing more
+        self.assertEqual(len(self.gw.orders), orders)
+        self.assertEqual(self.engine.auto_status["NVDA calls"]["note"], "all shares covered")
+
+    def test_respects_max_cost_and_market_hours(self):
+        self.manager(market_open=lambda: False).check()
+        self.assertEqual(len(self.gw.orders), 1)  # only the setUp buy
+        self.manager(max_shares_usd=10000).check()
+        self.assertIn("CC_MAX_SHARES_USD", self.engine.auto_status["NVDA calls"]["note"])
+
+    def test_assignment_is_reconciled(self):
+        self.cc.check()
+        self.gw.shares, self.gw.calls = 0, {}  # call exercised: shares called away
+        self.cc.check()
+        self.assertEqual(self.engine.broker.position_qty("NVDA"), 0)
+        self.assertEqual(self.cc.calls["NVDA"], [])
+        with open(self.engine.cfg.journal_path) as f:
+            self.assertIn("called_away", f.read())
+
+    def test_trend_sell_buys_back_the_call_first(self):
+        self.cc.check()
+        self.engine.broker.before_close = self.cc.cover
+        self.engine.execute("NVDA", "sell", 200.0, crypto=False)
+        self.assertEqual(self.gw.orders[-2:], [("NVDA", "BUY CALL 20261030 250.0", 1), ("NVDA", "SELL", 100)])
+        self.assertEqual((self.gw.calls, self.gw.shares), ({}, 0))
+
+    def test_shares_not_sold_if_call_buyback_fails(self):
+        self.cc.check()
+        self.engine.broker.before_close = self.cc.cover
+        self.gw.call_fill = 0
+        with self.assertRaisesRegex(BrokerError, "buy back"):
+            self.engine.execute("NVDA", "sell", 200.0, crypto=False)
+        self.assertEqual(self.gw.shares, 100)
+
+    def test_no_bid_means_no_order(self):
+        self.gw.quote = (None, None)
+        self.cc.check()
+        self.assertFalse(any("CALL" in o[1] for o in self.gw.orders))
+        self.assertIn("no bid", self.engine.auto_status["NVDA calls"]["note"])
+
+
 class ConfigTests(unittest.TestCase):
     def test_requires_secret(self):
         with self.assertRaises(ValueError):
@@ -398,6 +496,12 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual((scfg.broker, scfg.live_trading, scfg.max_position_usd), ("ibkr", False, 2000.0))
         self.assertEqual((scfg.journal_path, scfg.allowed_symbols), ("stock_trades.jsonl", {"SPY", "NVDA"}))
         self.assertEqual(cfg.broker, "paper")  # crypto side untouched
+
+    def test_covered_call_settings(self):
+        env = {"WEBHOOK_SECRET": SECRET, "STOCK_SYMBOLS": "NVDA,SPY", "COVERED_CALL_SYMBOLS": "nvda"}
+        self.assertEqual(Config.from_env(env).covered_call_symbols, ["NVDA"])
+        with self.assertRaisesRegex(ValueError, "also be in STOCK_SYMBOLS"):
+            Config.from_env(dict(env, COVERED_CALL_SYMBOLS="TSLA"))
 
     def test_binance_testnet_unless_live(self):
         env = {"WEBHOOK_SECRET": SECRET, "BROKER": "binance", "BINANCE_KEY": "k", "BINANCE_SECRET": "s"}

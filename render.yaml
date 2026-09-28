@@ -56,6 +56,13 @@ services:
         value: /data/stock_positions.json
       - key: STOCK_JOURNAL_PATH
         value: /data/stock_trades.jsonl
+      # Covered calls on some of the stock symbols (paper first). Empty = off.
+      - key: COVERED_CALL_SYMBOLS  # e.g. NVDA
+        sync: false
+      - key: CC_MAX_SHARES_USD  # 30000: max spent topping up to 100 shares
+        sync: false
+      - key: CC_STATE_PATH
+        value: /data/covered_calls.json
       - key: BINANCE_KEY
         sync: false
       - key: BINANCE_SECRET

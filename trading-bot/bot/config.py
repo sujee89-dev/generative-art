@@ -44,6 +44,14 @@ class Config:
     ibkr_live: bool = False
     stock_journal_path: str = "stock_trades.jsonl"
     stock_state_path: str = "stock_positions.json"
+    # Covered calls (see bot/covered_calls.py) on some of the stock symbols.
+    covered_call_symbols: list = field(default_factory=list)  # e.g. ["NVDA"]; empty = off
+    cc_otm_pct: float = 10.0
+    cc_min_dte: int = 21
+    cc_max_dte: int = 49
+    cc_target_dte: int = 35
+    cc_max_shares_usd: float = 30000.0  # never spend more than this topping up to 100 shares
+    cc_state_path: str = "covered_calls.json"
 
     @classmethod
     def from_env(cls, env=os.environ):
@@ -81,6 +89,13 @@ class Config:
             ibkr_live=env.get("IBKR_LIVE", "").lower() == "true",
             stock_journal_path=env.get("STOCK_JOURNAL_PATH", "stock_trades.jsonl"),
             stock_state_path=env.get("STOCK_STATE_PATH", "stock_positions.json"),
+            covered_call_symbols=[x.strip().upper() for x in env.get("COVERED_CALL_SYMBOLS", "").split(",") if x.strip()],
+            cc_otm_pct=float(env.get("CC_OTM_PCT", 10)),
+            cc_min_dte=int(env.get("CC_MIN_DTE", 21)),
+            cc_max_dte=int(env.get("CC_MAX_DTE", 49)),
+            cc_target_dte=int(env.get("CC_TARGET_DTE", 35)),
+            cc_max_shares_usd=float(env.get("CC_MAX_SHARES_USD", 30000)),
+            cc_state_path=env.get("CC_STATE_PATH", "covered_calls.json"),
         )
         # Real money only when explicitly requested.
         cfg.alpaca_base_url = ALPACA_LIVE_URL if cfg.live_trading else ALPACA_PAPER_URL
@@ -93,6 +108,11 @@ class Config:
             raise ValueError("BINANCE_KEY and BINANCE_SECRET are required when BROKER=binance")
         if cfg.auto_trade_symbol and cfg.broker not in ("paper", "kraken"):
             raise ValueError("AUTO_TRADE_SYMBOL reads Kraken's chart; use it with BROKER=paper or kraken")
+        extra = set(cfg.covered_call_symbols) - set(cfg.stock_symbols)
+        if extra:
+            raise ValueError(f"COVERED_CALL_SYMBOLS must also be in STOCK_SYMBOLS: {','.join(sorted(extra))}")
+        if not cfg.cc_min_dte <= cfg.cc_target_dte <= cfg.cc_max_dte:
+            raise ValueError("need CC_MIN_DTE <= CC_TARGET_DTE <= CC_MAX_DTE")
         if cfg.broker == "kraken":
             if not (cfg.kraken_key and cfg.kraken_secret):
                 raise ValueError("KRAKEN_KEY and KRAKEN_SECRET are required when BROKER=kraken")
