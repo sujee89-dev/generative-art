@@ -417,6 +417,10 @@ class CoveredCallTests(unittest.TestCase):
         self.assertEqual(pick_strike([240.0, 247.5, 250.0], 225.0), 250.0)  # >= 247.5
         self.assertEqual(limit_price(4.00, 4.40), 4.2)
         self.assertEqual(limit_price(0.52, 0.57), 0.54)
+        self.assertEqual(limit_price(2.20, 2.60, misses=1), 2.3)   # halfway to the bid
+        self.assertEqual(limit_price(2.20, 2.60, misses=2), 2.2)   # the bid
+        self.assertEqual(limit_price(2.20, 2.60, misses=9), 2.2)   # never below it
+        self.assertEqual(limit_price(3.10, 3.60, misses=1), 3.2)   # 0.05 ticks from $3
 
     def test_tops_up_to_100_then_sells_one_call(self):
         self.cc.check()
@@ -458,6 +462,19 @@ class CoveredCallTests(unittest.TestCase):
         with self.assertRaisesRegex(BrokerError, "buy back"):
             self.engine.execute("NVDA", "sell", 200.0, crypto=False)
         self.assertEqual(self.gw.shares, 100)
+
+    def test_unfilled_retries_ask_less(self):
+        self.gw.quote, self.gw.call_fill = (2.20, 2.60), 0
+        limits = []
+        orig = self.gw.call_order
+        self.gw.call_order = lambda *a, **k: (limits.append(k.get("limit")), orig(*a, **k))[1]
+        for _ in range(3):
+            self.cc.check()
+        self.assertEqual(limits, [2.4, 2.3, 2.2])
+        self.gw.call_fill = None
+        self.cc.check()
+        self.assertEqual(self.cc._misses["NVDA"], 0)
+        self.assertEqual(len(self.cc.calls["NVDA"]), 1)
 
     def test_no_bid_means_no_order(self):
         self.gw.quote = (None, None)
