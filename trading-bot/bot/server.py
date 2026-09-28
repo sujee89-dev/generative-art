@@ -12,6 +12,7 @@ from .config import Config
 from .covered_calls import CoveredCallManager
 from .engine import Rejected, TradingEngine
 from .ibkr import IBGateway, IBKRBroker
+from .news import NewsGuard, claude_assessor
 from .stockdata import fetch_stock_daily_candles, us_market_open
 
 log = logging.getLogger("trading-bot")
@@ -25,7 +26,7 @@ def safe_status(engine):
         return {"broker": engine.cfg.broker, "error": str(e), "auto_trader": engine.auto_status or None}
 
 
-def make_handler(engine, stock_engine=None):
+def make_handler(engine, stock_engine=None, news=None):
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status, body):
             data = json.dumps(body).encode()
@@ -42,6 +43,8 @@ def make_handler(engine, stock_engine=None):
                 body = safe_status(engine)
                 if stock_engine:
                     body["stocks"] = safe_status(stock_engine)
+                if news:
+                    body["news"] = news.status()
                 self._send(200, body)
             else:
                 self._send(404, {"error": "not found"})
@@ -96,12 +99,20 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = Config.from_env()
     engine = build_engine(cfg)
+    stock_engine = build_stock_engine(cfg)
+    news = None
+    if cfg.news_pause_enabled and cfg.news_symbols:
+        news = NewsGuard(cfg.news_symbols, claude_assessor(cfg.news_model), cfg.news_state_path,
+                         pause_hours=cfg.news_pause_hours, interval_s=cfg.news_check_minutes * 60)
+        for e in (engine, stock_engine):
+            if e:
+                e.news_guard = news
+        news.start()
     mode = "LIVE MONEY" if (cfg.broker != "paper" and cfg.live_trading) else "paper/simulated"
     log.info("broker=%s mode=%s listening on :%d", cfg.broker, mode, cfg.port)
     if cfg.auto_trade_symbol:
         AutoTrader(engine, cfg.auto_trade_symbol, cfg.trend_sma, cfg.trend_exit_buffer_pct / 100,
                    cfg.auto_check_minutes * 60).start()
-    stock_engine = build_stock_engine(cfg)
     if stock_engine:
         log.info("stock bot: %s via IBKR %s:%d (%s)", ",".join(cfg.stock_symbols), cfg.ibkr_host,
                  cfg.ibkr_port, "LIVE MONEY" if cfg.ibkr_live else "paper")
@@ -115,7 +126,7 @@ def main():
                                    cfg.cc_max_shares_usd, cfg.auto_check_minutes * 60)
         stock_engine.broker.before_close = calls.cover
         calls.start()
-    ThreadingHTTPServer(("0.0.0.0", cfg.port), make_handler(engine, stock_engine)).serve_forever()
+    ThreadingHTTPServer(("0.0.0.0", cfg.port), make_handler(engine, stock_engine, news)).serve_forever()
 
 
 if __name__ == "__main__":

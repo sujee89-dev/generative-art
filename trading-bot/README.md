@@ -140,6 +140,29 @@ Quotes use IBKR's free delayed data when you have no options data subscription. 
 calls cap your upside: if the stock jumps more than about 10% in a month, you keep the premium but
 miss the rest of the rise.
 
+## News pause (optional, uses Claude)
+
+With `NEWS_PAUSE_ENABLED=true` and an `ANTHROPIC_API_KEY`, the bot works through these steps every
+`NEWS_CHECK_MINUTES` (60):
+
+1. It reads the last 24 hours of Google News headlines for each symbol it trades. You can pick
+   the symbols with `NEWS_SYMBOLS`.
+2. If any headlines are new, it asks Claude in one request whether a symbol has **severe** news.
+   Severe means a concrete event such as a hack, bankruptcy, fraud, a ban, delisting, a trading
+   halt or a market crash.
+3. A flagged symbol can't be **bought** for `NEWS_PAUSE_HOURS` (24). Covered-call top-ups are
+   blocked too.
+
+The news check never sells and never starts a trade. Ordinary price moves, analyst calls,
+earnings and rumours are not severe.
+
+If the news feed or Claude fails, nothing is paused and the error is shown on `/status`, which
+also lists active pauses under `news`. Pauses are saved in `NEWS_STATE_PATH`.
+
+`NEWS_MODEL` defaults to `claude-opus-5-5`. With about 8 symbols and hourly checks that costs
+roughly $1 a day. `claude-haiku-4-5` costs much less but judges less carefully. Raising
+`NEWS_CHECK_MINUTES` also cuts the cost.
+
 ## Risk controls (enforced by the bot, whatever the alert says)
 
 | Setting | Default | What it does |
@@ -156,7 +179,7 @@ a symbol it already holds, alerts need the shared secret, and every trade is app
 ## Setup
 
 Requires Python 3.9 or newer. The crypto bot uses only the standard library. The stock bot also
-needs Python 3.10+ and `pip install -r requirements.txt` (`ib_async`, `tzdata`); the Docker image installs these.
+needs Python 3.10+ and `pip install -r requirements.txt` (`ib_async`, `tzdata`, and `anthropic` for the news pause); the Docker image installs these.
 
 ### 1. Run the bot with the built-in simulator
 
@@ -266,6 +289,7 @@ cd trading-bot && python -m unittest discover -s tests -t .
 
 - `bot/ibkr.py`: Interactive Brokers stocks and options through IB Gateway (ib_async).
 - `bot/covered_calls.py`: sells and manages covered calls on held stocks.
+- `bot/news.py`: news pause (Google News headlines judged by Claude).
 - `bot/stockdata.py`: free daily US stock prices (Stooq, Yahoo fallback) and market hours.
 - `bot/autotrader.py`: reads Kraken's daily chart and trades Trend (200 SMA) without TradingView.
 - `bot/server.py`: HTTP server with `POST /webhook`, `GET /status` and `GET /health`.

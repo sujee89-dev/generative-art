@@ -63,6 +63,15 @@ services:
         sync: false
       - key: CC_STATE_PATH
         value: /data/covered_calls.json
+      # News pause: Claude reads headlines and blocks NEW buys after severe bad news (never sells).
+      - key: NEWS_PAUSE_ENABLED  # true to turn on (needs ANTHROPIC_API_KEY)
+        sync: false
+      - key: ANTHROPIC_API_KEY  # from console.anthropic.com
+        sync: false
+      - key: NEWS_MODEL  # empty = claude-opus-5-5; claude-haiku-4-5 is cheaper
+        sync: false
+      - key: NEWS_STATE_PATH
+        value: /data/news_pauses.json
       - key: BINANCE_KEY
         sync: false
       - key: BINANCE_SECRET

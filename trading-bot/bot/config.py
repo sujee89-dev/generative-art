@@ -52,6 +52,13 @@ class Config:
     cc_target_dte: int = 35
     cc_max_shares_usd: float = 30000.0  # never spend more than this topping up to 100 shares
     cc_state_path: str = "covered_calls.json"
+    # News pause (see bot/news.py): Claude reads headlines and blocks NEW buys after severe news.
+    news_pause_enabled: bool = False
+    news_symbols: list = field(default_factory=list)  # empty = every symbol the bot trades
+    news_pause_hours: float = 24.0
+    news_check_minutes: int = 60
+    news_model: str = "claude-opus-5-5"
+    news_state_path: str = "news_pauses.json"
 
     @classmethod
     def from_env(cls, env=os.environ):
@@ -96,7 +103,17 @@ class Config:
             cc_target_dte=int(env.get("CC_TARGET_DTE", 35)),
             cc_max_shares_usd=float(env.get("CC_MAX_SHARES_USD", 30000)),
             cc_state_path=env.get("CC_STATE_PATH", "covered_calls.json"),
+            news_pause_enabled=env.get("NEWS_PAUSE_ENABLED", "").lower() == "true",
+            news_symbols=[x.strip().upper() for x in env.get("NEWS_SYMBOLS", "").split(",") if x.strip()],
+            news_pause_hours=float(env.get("NEWS_PAUSE_HOURS", 24)),
+            news_check_minutes=int(env.get("NEWS_CHECK_MINUTES", 60)),
+            news_model=env.get("NEWS_MODEL", "").strip() or "claude-opus-5-5",
+            news_state_path=env.get("NEWS_STATE_PATH", "news_pauses.json"),
         )
+        if cfg.news_pause_enabled and not env.get("ANTHROPIC_API_KEY"):
+            raise ValueError("ANTHROPIC_API_KEY is required when NEWS_PAUSE_ENABLED=true")
+        if not cfg.news_symbols:
+            cfg.news_symbols = ([cfg.auto_trade_symbol] if cfg.auto_trade_symbol else []) + cfg.stock_symbols
         # Real money only when explicitly requested.
         cfg.alpaca_base_url = ALPACA_LIVE_URL if cfg.live_trading else ALPACA_PAPER_URL
         cfg.binance_base_url = BINANCE_LIVE_URL if cfg.live_trading else BINANCE_TESTNET_URL
