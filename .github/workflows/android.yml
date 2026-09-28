@@ -3,6 +3,7 @@ name: Build Android app
 # Builds the Fire tablet / Android app from the ahara/ web app and publishes it
 # as the "ahara-latest" release, so the newest APK is always at:
 # https://github.com/sujee89-dev/generative-art/releases/download/ahara-latest/ahara-reading-room.apk
+# and on the Pages site at https://sujee89-dev.github.io/generative-art/downloads/
 on:
   push:
     branches: [main, claude/bilingual-reading-app-ahara-bnxez5]
@@ -48,6 +49,18 @@ jobs:
         with:
           name: ahara-reading-room-apk
           path: ahara-reading-room.apk
+
+      - name: Put the APK on the GitHub Pages site (a plain download with no redirects)
+        if: github.ref_name == 'claude/bilingual-reading-app-ahara-bnxez5'
+        run: |
+          mkdir -p downloads
+          cp ahara-reading-room.apk downloads/ahara-reading-room.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898099+github-actions[bot]@users.noreply.github.com"
+          git add downloads/ahara-reading-room.apk
+          git commit -m "Update the Android app download (build ${{ github.run_number }})" || exit 0
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
 
       - name: Publish as the latest release
         env:

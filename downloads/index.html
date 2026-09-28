@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get Ahara's Reading Room</title>
+<link rel="icon" href="../ahara/icons/icon-192.png">
+<style>
+  :root { --ink: #1d3557; --soft: #52698a; --sky: #dff1f7; --paper: #fffdf7; --go: #3fa66b; --line: #c9dde8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--sky); color: var(--ink); font: 18px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 48px; }
+  .card { background: var(--paper); border-radius: 24px; padding: 20px; box-shadow: 0 6px 0 var(--line); }
+  header { display: flex; gap: 14px; align-items: center; }
+  header img { width: 72px; height: 72px; border-radius: 16px; }
+  h1 { margin: 0; font-size: 1.6rem; line-height: 1.2; }
+  header p { margin: 2px 0 0; color: var(--soft); }
+  .get { display: block; text-align: center; margin: 20px 0 8px; padding: 18px; border-radius: 999px; background: var(--go); color: #fff; font-weight: 800; font-size: 1.3rem; text-decoration: none; box-shadow: 0 5px 0 rgba(29,53,87,.25); }
+  .get:focus-visible { outline: 3px dashed var(--ink); outline-offset: 3px; }
+  .size { text-align: center; color: var(--soft); margin: 0 0 18px; font-size: .95rem; }
+  h2 { font-size: 1.1rem; margin: 22px 0 6px; }
+  ol { padding-left: 1.3em; margin: 0; }
+  li { margin-bottom: 8px; }
+  .web { display: block; text-align: center; margin-top: 18px; color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <header>
+      <img src="../ahara/icons/icon-192.png" alt="">
+      <div><h1>Ahara's Reading Room</h1><p>App for Amazon Fire and Android tablets</p></div>
+    </header>
+    <a class="get" href="ahara-reading-room.apk" download="ahara-reading-room.apk" type="application/vnd.android.package-archive">⬇ Download the app</a>
+    <p class="size">About 1 MB. Works without internet once installed.</p>
+
+    <h2>Install on a Fire tablet (use the parent profile)</h2>
+    <ol>
+      <li>Settings → <b>Security &amp; Privacy</b> → <b>Apps from Unknown Sources</b> → turn on <b>Silk Browser</b>.</li>
+      <li>Tap <b>Download the app</b> above. If Silk asks, choose <b>Download</b> or <b>OK</b>.</li>
+      <li>When it finishes, tap the download (or open the <b>Files</b> app → <b>Downloads</b>) and tap <b>Install</b>.</li>
+      <li>To give it to a child: Settings → <b>Profiles &amp; Family Library</b> → the child's profile → <b>Add Content</b> → <b>Apps</b> → tick <b>Ahara</b>.</li>
+    </ol>
+
+    <h2>If the download will not finish</h2>
+    <ol>
+      <li>Make sure you are in a parent profile, not a Kids profile. Kids profiles cannot download apps.</li>
+      <li>Install the free <b>Downloader</b> app from the Amazon Appstore, open it and type this address:<br>
+        <b>sujee89-dev.github.io/generative-art/downloads/ahara-reading-room.apk</b></li>
+    </ol>
+    <a class="web" href="../ahara/">Or use the web version in the browser →</a>
+  </div>
+</main>
+</body>
+</html>
