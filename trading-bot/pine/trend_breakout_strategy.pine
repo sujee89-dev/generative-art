@@ -1,49 +1,74 @@
 //@version=5
-// Trend breakout strategy that sends webhook alerts to the trading bot.
+// Trend strategies that send webhook alerts to the trading bot. Use the DAILY (1D) chart.
 //
-// Built for the DAILY (1D) chart, or 4h at the shortest. It trades rarely and lets winners run,
-// so fees are a small part of each trade (unlike short-timeframe strategies, where they
-// swallow most of the edge).
+// Pick a style in Settings → Inputs → "Strategy":
+//   - Breakout:        buy when the bar closes above the previous 20-bar high while above the
+//                      200-bar SMA; sell when it closes below the previous 10-bar low.
+//   - Trend (200 SMA): hold while price is above its 200-bar SMA; sell when it closes more than
+//                      "Trend exit buffer %" below it. The buffer avoids paying fees on every wobble.
+//   - Golden cross:    hold while the 50-bar SMA is above the 200-bar SMA.
 //
-// How it "reads the chart":
-//   - Trend filter: only buy while price is above its 200-bar average (long-term uptrend)
-//   - Buy:  the bar closes above the highest high of the previous 20 bars (a breakout)
-//   - Sell: the bar closes below the lowest low of the previous 10 bars
-//           (a trailing exit that rises as price rises, with no fixed take-profit cap)
+// All three are long-only and sit in cash during downtrends. Each trade uses
+// "% of account per trade" of the account.
 //
-// Setup is the same as ema_rsi_strategy.pine: add it to a KRAKEN:BTCCAD 1D chart, compare it
-// with "Buy & hold" in the Strategy Tester, and only create the webhook alert if it clearly wins.
+// Honest testing: pick the style using an early period ("Only trade from" 2016 and
+// "Stop trading at" 2022-01-01). Then check that style once on 2022 to today, which it was never
+// tuned on. Only trust it if it still holds up there.
 //
 // commission_value=0.4 (%) is about Kraken's market-order fee for small accounts.
 strategy("Trend Breakout Webhook Bot", overlay=true, initial_capital=10000,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
      commission_type=strategy.commission.percent, commission_value=0.4)
 
+mode     = input.string("Breakout", "Strategy", options=["Breakout", "Trend (200 SMA)", "Golden cross"])
+sizePct  = input.float(95, "% of account per trade", minval=1, maxval=100)
 entryLen = input.int(20, "Breakout: highest high of last N bars")
-exitLen  = input.int(10, "Exit: lowest low of last N bars")
-trendLen = input.int(200, "Trend filter: SMA length")
+exitLen  = input.int(10, "Breakout: exit at lowest low of last N bars")
+trendLen = input.int(200, "Trend SMA length")
+fastLen  = input.int(50, "Golden cross: fast SMA length")
+bufferPct = input.float(3.0, "Trend exit buffer %") / 100
 secret   = input.string("change-me", "Webhook secret")
-// Backtest only from this date (free alternative to the Strategy Tester's paid custom date range).
+// Test windows (a free alternative to the Strategy Tester's paid custom date range).
 startAt  = input.time(timestamp("2015-01-01"), "Only trade from this date")
+endAt    = input.time(timestamp("2100-01-01"), "Stop trading at this date")
 
 upper = ta.highest(high, entryLen)[1]
 lower = ta.lowest(low, exitLen)[1]
 trend = ta.sma(close, trendLen)
+fast  = ta.sma(close, fastLen)
 
-longEntry = time >= startAt and strategy.position_size == 0 and close > upper and close > trend
-longExit  = strategy.position_size > 0 and close < lower
+var bool wantIn  = false
+var bool wantOut = false
+if mode == "Breakout"
+    wantIn  := close > upper and close > trend
+    wantOut := close < lower
+else if mode == "Trend (200 SMA)"
+    wantIn  := close > trend
+    wantOut := close < trend * (1 - bufferPct)
+else
+    wantIn  := fast > trend
+    wantOut := fast < trend
 
-plot(upper, "Breakout level", color=color.teal)
-plot(lower, "Exit level", color=color.red)
+inWindow  = time >= startAt and time < endAt
+flat      = strategy.position_size == 0
+longEntry = inWindow and flat and wantIn and not na(trend)
+longExit  = not flat and wantOut
+
+plot(mode == "Breakout" ? upper : na, "Breakout level", color=color.teal)
+plot(mode == "Breakout" ? lower : na, "Exit level", color=color.red)
+plot(mode == "Golden cross" ? fast : na, "Fast SMA", color=color.teal)
 plot(trend, "Trend SMA", color=color.orange, linewidth=2)
 
 msg(action) =>
     '{"secret":"' + secret + '","symbol":"' + syminfo.ticker + '","type":"' + syminfo.type + '","action":"' + action + '","price":' + str.tostring(close) + '}'
 
 if longEntry
-    strategy.entry("Long", strategy.long)
+    strategy.entry("Long", strategy.long, qty=strategy.equity * sizePct / 100 / close)
     alert(msg("buy"), alert.freq_once_per_bar_close)
 
 if longExit
     strategy.close("Long")
     alert(msg("sell"), alert.freq_once_per_bar_close)
+
+// End of a test window: close any open trade so the result only covers that window (no alert).
+if time >= endAt and not flat
+    strategy.close("Long", comment="End of test window")

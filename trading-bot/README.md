@@ -17,9 +17,13 @@ TradingView has no API for pulling chart data or signals. The supported way to a
 **Pine Script** strategy that runs on TradingView's servers, analyses each bar, and fires a
 **webhook alert** when it wants to trade. There are two strategies in `pine/`:
 
-- **`trend_breakout_strategy.pine`** (try this first, on the **daily** chart): buys when price
-  closes above its 20-bar high while above the 200-bar average, and sells when it closes below
-  its 10-bar low. It trades rarely and lets winners run, so fees matter less.
+- **`trend_breakout_strategy.pine`** (try this first, on the **daily** chart): three trend styles
+  you choose between in its settings (20-bar breakout, 200-SMA trend and 50/200 golden cross). All
+  of them sit in cash during downtrends. It has start and stop date inputs, so you can pick a style
+  on one period and check it on a later one it was never tuned on.
+  - Breakout at 10% per trade, 2022–Sep 2026: +8.2% on the account (about 2%/year) with a 2.8%
+    max drawdown, against +346% for buy and hold. It avoided the 2022 crash but badly lagged the
+    rallies, which is why position size now defaults to 95%.
 - **`ema_rsi_strategy.pine`**: buys RSI pullbacks in an EMA uptrend with a 3% stop and 6% target.
   On `KRAKEN:BTCCAD` 1h (Dec 2024–Sep 2026) it **lost 2.5%**: 2 winners out of 26 trades, with
   fees making up most of the loss. It's kept as an example of what the Strategy Tester is for.
