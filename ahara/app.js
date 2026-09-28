@@ -88,7 +88,7 @@ const safePic = (p, fallback = "📖") => graphemes(p || "").every(emojiOK) ? p 
 /* ---------------------------------------------------------------- state */
 let lang = store.get("lang", "en");
 if (!["en", "fr", "ta"].includes(lang)) lang = "en";
-let tab = Math.min(6, Math.max(0, store.get("tab", 0) | 0));
+let tab = Math.min(8, Math.max(0, store.get("tab", 0) | 0));
 let stars = store.get("stars", 0) | 0;
 const nm = () => NAMES[lang] || CHILD;
 const fillName = s => s.replaceAll("{n}", nm());
@@ -98,7 +98,7 @@ const fillEn = s => s.replaceAll("{n}", CHILD);
 const UI = {
   en: {
     hello: n => `Hello, ${n}!`, sub: "Reading Room", sound: "Sound",
-    tabs: ["Letters", "Words", "Read", "Play", "Books", "Math", "Colors & Numbers"],
+    tabs: ["Letters", "Words", "Read", "Play", "Books", "Math", "Colors & Numbers", "World", "Chess"],
     footer: "Tap any word to hear it.",
     levels: ["All", "Easy", "Medium", "Hard"],
     lettersH: "The alphabet", lettersHint: n => `Tap a letter. The pink ones are in your name, ${n}!`,
@@ -193,8 +193,10 @@ function tt(key, ...args) {
   return esc(native) + (showEn() ? `<small class="en">${esc(pick(UI.en))}</small>` : "");
 }
 const enUnder = s => showEn() && s ? `<small class="en">${esc(s)}</small>` : "";
-const TAB_ICONS = ["🔤", "🧩", "💬", "🎯", "📚", "➕", "🎨"];
-const TAB_COLORS = ["#2f8fd8", "#3fa66b", "#8a5cc7", "#f28a2e", "#e84a7f", "#0f8f84", "#c2410c"];
+const TAB_ICONS = ["🔤", "🧩", "💬", "🎯", "📚", "➕", "🎨", "🌍", "♟️"];
+const TAB_COLORS = ["#2f8fd8", "#3fa66b", "#8a5cc7", "#f28a2e", "#e84a7f", "#0f8f84", "#c2410c", "#1a7f5a", "#5b4636"];
+// World and Chess are English-only sections.
+const tabVisible = i => i < 7 || lang === "en";
 
 const LETTERS = {
   en: [
@@ -706,7 +708,9 @@ function renderChrome() {
   document.querySelectorAll(".lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === lang));
   const nav = $("#tabs");
   nav.innerHTML = "";
+  if (!tabVisible(tab)) tab = 0;
   t().tabs.forEach((label, i) => {
+    if (!tabVisible(i)) return;
     const b = document.createElement("button");
     b.type = "button";
     b.setAttribute("role", "tab");
@@ -1797,7 +1801,13 @@ function confetti() {
 }
 
 /* ---------------------------------------------------------------- boot */
-const VIEWS = [() => lang === "ta" ? viewTamilLetters() : viewLetters(), viewWords, viewRead, viewPlay, viewBooks, viewMath, viewColorsNumbers];
+const VIEWS = [() => lang === "ta" ? viewTamilLetters() : viewLetters(), viewWords, viewRead, viewPlay, viewBooks, viewMath, viewColorsNumbers,
+  () => window.AharaWorld.render(), () => window.AharaChess.render()];
+// Shared helpers for the sections that live in their own files (world.js, chess.js).
+window.Ahara = {
+  panel, $, esc, store, shuffle, pick, draw, addStar, confetti, emojiOK, graphemes, say,
+  stop: () => Speech.stop(), CHILD, isTab: i => tab === i
+};
 function render() { renderChrome(); VIEWS[tab](); }
 document.querySelectorAll(".lang button").forEach(b => b.onclick = () => {
   lang = b.dataset.lang;
