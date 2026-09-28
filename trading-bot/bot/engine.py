@@ -1,4 +1,4 @@
-"""Turns validated TradingView alerts into orders, enforcing risk limits."""
+"""Turns validated trade signals (TradingView alerts or AutoTrader) into orders, enforcing risk limits."""
 import datetime as dt
 import hmac
 import json
@@ -25,6 +25,7 @@ class TradingEngine:
         self._day_start_equity = None
         self._trades_today = 0
         self.halted_reason = None
+        self.auto_status = None  # last AutoTrader check, shown on /status
 
     def handle_alert(self, payload):
         """Validate and act on one alert. Returns a dict describing what happened."""
@@ -50,6 +51,10 @@ class TradingEngine:
         if self.cfg.allowed_symbols and symbol not in self.cfg.allowed_symbols:
             raise Rejected(f"{symbol} is not in ALLOWED_SYMBOLS", status=403)
 
+        return self.execute(symbol, action, price, crypto)
+
+    def execute(self, symbol, action, price, crypto):
+        """Place a validated buy/sell, enforcing the risk limits. Used by webhooks and AutoTrader."""
         with self._lock:
             self.broker.mark(symbol, price)
             self._roll_day()
@@ -104,4 +109,5 @@ class TradingEngine:
                 "day_start_equity": self._day_start_equity,
                 "trades_today": self._trades_today,
                 "halted": self.halted_reason,
+                "auto_trader": self.auto_status,
             }

@@ -61,6 +61,26 @@ Both strategies are long-only. It works on stock and crypto charts. Each alert s
 Stocks are bought in whole shares; crypto in fractions. On Binance and Kraken the bot tracks the
 coins it bought itself (in `STATE_PATH`) and only ever sells those, so coins you already own are safe.
 
+## Auto-trading without TradingView (recommended)
+
+Set `AUTO_TRADE_SYMBOL=BTCCAD` and the bot reads the chart itself. Once an hour it downloads
+Kraken's daily BTC/CAD candles (a free public API, no account needed) and applies the tested
+**Trend (200 SMA)** rule to the last *completed* day:
+
+- **Buy** when it holds nothing and the close is above the 200-day average.
+- **Sell** when it holds a position and the close is more than 3% below the 200-day average.
+
+It acts at most once per daily candle. It uses the same risk limits and journal as webhooks, and
+`GET /status` shows the last check under `auto_trader` (close, average, signal, result).
+No TradingView subscription or alert is needed; the Pine Script is only for backtesting.
+Settings: `TREND_SMA` (200), `TREND_EXIT_BUFFER_PCT` (3) and `AUTO_CHECK_MINUTES` (60). It works
+with `BROKER=paper` or `kraken`.
+
+Unlike the backtest, which compounds 95% of the account, the bot spends a fixed
+`MAX_POSITION_USD` per buy (in CAD for CAD pairs). With `BROKER=paper` the simulated position
+lives in memory, so after a restart the bot is flat and simply buys again at the next check if
+the trend is still up.
+
 ## Risk controls (enforced by the bot, whatever the alert says)
 
 | Setting | Default | What it does |
@@ -184,6 +204,7 @@ cd trading-bot && python -m unittest discover -s tests -t .
 
 ## Files
 
+- `bot/autotrader.py`: reads Kraken's daily chart and trades Trend (200 SMA) without TradingView.
 - `bot/server.py`: HTTP server with `POST /webhook`, `GET /status` and `GET /health`.
 - `bot/engine.py`: alert validation, risk limits and the trade journal.
 - `bot/brokers.py`: `PaperBroker` (the simulator), `AlpacaBroker`, `BinanceBroker` and `KrakenBroker`.

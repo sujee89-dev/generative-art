@@ -21,6 +21,10 @@ services:
         generateValue: true
       - key: BROKER
         value: paper
+      # The bot reads Kraken's daily BTC/CAD chart itself and trades Trend (200 SMA);
+      # no TradingView alert needed. Set to empty to rely on TradingView webhooks instead.
+      - key: AUTO_TRADE_SYMBOL
+        value: BTCCAD
       - key: LIVE_TRADING
         value: "false"
       - key: MAX_POSITION_USD
