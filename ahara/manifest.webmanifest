@@ -1,0 +1,16 @@
+{
+  "name": "Ahara's Reading Room",
+  "short_name": "Ahara",
+  "description": "Reading in English, French and Tamil, Tamil letters, math, colors and numbers, a world map and chess.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#dff1f7",
+  "theme_color": "#2f8fd8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

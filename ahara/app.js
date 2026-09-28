@@ -1824,4 +1824,8 @@ document.addEventListener("keydown", Speech.unlock, { capture: true });
 prepareData();
 drawBackdrop();
 render();
+// Installed-app support: save the app on the device so it also works offline.
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  try { navigator.serviceWorker.register("sw.js").catch(() => {}); } catch {}
+}
 })();
