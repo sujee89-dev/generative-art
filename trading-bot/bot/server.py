@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from .autotrader import AutoTrader
 from .brokers import AlpacaBroker, BinanceBroker, BrokerError, KrakenBroker, PaperBroker
 from .config import Config
+from .covered_calls import CoveredCallManager
 from .engine import Rejected, TradingEngine
 from .ibkr import IBGateway, IBKRBroker
 from .stockdata import fetch_stock_daily_candles, us_market_open
@@ -108,6 +109,12 @@ def main():
             AutoTrader(stock_engine, symbol, cfg.trend_sma, cfg.trend_exit_buffer_pct / 100,
                        cfg.auto_check_minutes * 60, fetch=fetch_stock_daily_candles, crypto=False,
                        market_open=us_market_open).start()
+    if stock_engine and cfg.covered_call_symbols:
+        calls = CoveredCallManager(stock_engine, cfg.covered_call_symbols, cfg.cc_state_path,
+                                   cfg.cc_otm_pct / 100, cfg.cc_min_dte, cfg.cc_max_dte, cfg.cc_target_dte,
+                                   cfg.cc_max_shares_usd, cfg.auto_check_minutes * 60)
+        stock_engine.broker.before_close = calls.cover
+        calls.start()
     ThreadingHTTPServer(("0.0.0.0", cfg.port), make_handler(engine, stock_engine)).serve_forever()
 
 

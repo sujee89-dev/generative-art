@@ -4,3 +4,4 @@ __pycache__/
 positions.json
 .env
 stock_positions.json
+covered_calls.json

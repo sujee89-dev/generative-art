@@ -4,3 +4,4 @@ trades.jsonl
 .env
 positions.json
 stock_positions.json
+covered_calls.json
