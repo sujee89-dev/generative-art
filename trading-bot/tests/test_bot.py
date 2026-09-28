@@ -1,14 +1,16 @@
 import datetime as dt
+import io
 import json
 import os
 import tempfile
 import threading
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import ThreadingHTTPServer
 
-from bot.brokers import PaperBroker
+from bot.brokers import AlpacaBroker, BinanceBroker, PaperBroker, split_pair
 from bot.config import Config
 from bot.engine import Rejected, TradingEngine
 from bot.server import make_handler
@@ -25,8 +27,23 @@ def make_engine(**overrides):
     return engine, day
 
 
-def alert(action, price, symbol="AAPL", secret=SECRET):
-    return {"secret": secret, "symbol": symbol, "action": action, "price": price}
+def alert(action, price, symbol="AAPL", secret=SECRET, **extra):
+    return dict({"secret": secret, "symbol": symbol, "action": action, "price": price}, **extra)
+
+
+class FakeHTTP:
+    """Stands in for urllib.request.urlopen; replies from a {(method, path): body} table."""
+
+    def __init__(self, routes):
+        self.routes = routes
+        self.requests = []
+
+    def __call__(self, req, timeout=None):
+        url = urllib.parse.urlsplit(req.full_url)
+        self.requests.append((req.get_method(), url.path, urllib.parse.parse_qs(url.query), req.data))
+        body = self.routes[(req.get_method(), url.path)]
+        body = body() if callable(body) else body
+        return io.BytesIO(json.dumps(body).encode())
 
 
 class EngineTests(unittest.TestCase):
@@ -87,6 +104,58 @@ class EngineTests(unittest.TestCase):
         with open(engine.cfg.journal_path) as f:
             self.assertEqual(json.loads(f.readline())["side"], "buy")
 
+    def test_crypto_buys_fractional_quantity(self):
+        engine, _ = make_engine(max_position_usd=1000)
+        buy = engine.handle_alert(alert("buy", 60000, symbol="BTCUSD", type="crypto"))
+        self.assertAlmostEqual(buy["qty"], 0.016666)
+        with self.assertRaises(Rejected):  # stocks still need whole shares
+            engine.handle_alert(alert("buy", 60000, symbol="BRK.A"))
+
+
+class BrokerTests(unittest.TestCase):
+    def test_split_pair(self):
+        self.assertEqual(split_pair("BTCUSDT"), ("BTC", "USDT"))
+        self.assertEqual(split_pair("ETHUSD"), ("ETH", "USD"))
+
+    def test_alpaca_crypto_order(self):
+        http = FakeHTTP({("POST", "/v2/orders"): {"id": "o1"}})
+        AlpacaBroker("k", "s", "https://x", opener=http).buy("BTCUSD", 0.0125, 60000, crypto=True)
+        order = json.loads(http.requests[0][3])
+        self.assertEqual((order["symbol"], order["qty"], order["time_in_force"]), ("BTC/USD", "0.012500", "gtc"))
+
+    def binance(self, state_path, balance="0.5"):
+        http = FakeHTTP({
+            ("GET", "/api/v3/exchangeInfo"): {"symbols": [{"baseAsset": "BTC", "filters": [
+                {"filterType": "LOT_SIZE", "stepSize": "0.00001000"}]}]},
+            ("GET", "/api/v3/account"): {"balances": [
+                {"asset": "USDT", "free": "900", "locked": "0"}, {"asset": "BTC", "free": balance, "locked": "0"}]},
+            ("POST", "/api/v3/order"): lambda: {"orderId": 7, "executedQty": "0.0166",
+                                                 "cummulativeQuoteQty": "996", "fills": [
+                                                     {"commission": "0.0000166", "commissionAsset": "BTC"}]},
+        })
+        return BinanceBroker("k", "s", "https://x", state_path, opener=http, clock=lambda: 1), http
+
+    def test_binance_only_sells_what_it_bought(self):
+        state = os.path.join(tempfile.mkdtemp(), "positions.json")
+        broker, http = self.binance(state)
+        broker.buy("BTCUSDT", 0.016666, 60000)
+        self.assertEqual(http.requests[-1][2]["quoteOrderQty"], ["999.96"])
+        self.assertIn("signature", http.requests[-1][2])
+        # Survives a restart, and sells the bought amount (net of fees) rounded to the lot size,
+        # not the account's full 0.5 BTC.
+        broker, http = self.binance(state)
+        self.assertAlmostEqual(broker.position_qty("BTCUSDT"), 0.0165834)
+        sell = broker.close("BTCUSDT", 61000)
+        self.assertEqual(http.requests[-1][2]["quantity"], ["0.01658000"])
+        self.assertEqual(sell["qty"], 0.01658)
+        self.assertEqual(broker.position_qty("BTCUSDT"), 0)
+        self.assertIsNone(broker.close("BTCUSDT", 61000))
+
+    def test_binance_engine_rejects_stocks(self):
+        engine, _ = make_engine(broker="binance")
+        with self.assertRaises(Rejected):
+            engine.handle_alert(alert("buy", 100, type="stock"))
+
 
 class ConfigTests(unittest.TestCase):
     def test_requires_secret(self):
@@ -97,6 +166,11 @@ class ConfigTests(unittest.TestCase):
         env = {"WEBHOOK_SECRET": SECRET, "BROKER": "alpaca", "ALPACA_KEY": "k", "ALPACA_SECRET": "s"}
         self.assertIn("paper-api", Config.from_env(env).alpaca_base_url)
         self.assertNotIn("paper", Config.from_env(dict(env, LIVE_TRADING="true")).alpaca_base_url)
+
+    def test_binance_testnet_unless_live(self):
+        env = {"WEBHOOK_SECRET": SECRET, "BROKER": "binance", "BINANCE_KEY": "k", "BINANCE_SECRET": "s"}
+        self.assertIn("testnet", Config.from_env(env).binance_base_url)
+        self.assertEqual(Config.from_env(dict(env, LIVE_TRADING="true")).binance_base_url, "https://api.binance.com")
 
 
 class ServerTests(unittest.TestCase):
@@ -124,6 +198,8 @@ class ServerTests(unittest.TestCase):
         self.assertEqual((status, body["qty"]), (200, 10))
         self.assertEqual(self.post(b"not json")[0], 400)
         self.assertEqual(self.post(json.dumps(alert("buy", 1, secret="nope")).encode())[0], 401)
+        with urllib.request.urlopen(self.base + "/health") as r:
+            self.assertEqual(json.loads(r.read()), {"ok": True})
         with urllib.request.urlopen(self.base + "/status") as r:
             self.assertEqual(json.loads(r.read())["trades_today"], 1)
 

@@ -15,10 +15,11 @@ class Rejected(Exception):
 
 
 class TradingEngine:
-    def __init__(self, config, broker, today=dt.date.today):
+    def __init__(self, config, broker, today=None):
         self.cfg = config
         self.broker = broker
-        self._today = today
+        # Days roll over at midnight UTC (crypto trades 24/7, so pick one fixed clock).
+        self._today = today or (lambda: dt.datetime.now(dt.timezone.utc).date())
         self._lock = threading.Lock()
         self._day = None
         self._day_start_equity = None
@@ -38,6 +39,9 @@ class TradingEngine:
             price = float(payload.get("price"))
         except (TypeError, ValueError):
             raise Rejected("price must be a number")
+        crypto = str(payload.get("type", "")).lower() == "crypto" or self.cfg.broker == "binance"
+        if self.cfg.broker == "binance" and payload.get("type") not in (None, "crypto"):
+            raise Rejected("Binance only trades crypto")
         if not symbol or action not in ("buy", "sell"):
             raise Rejected("symbol and action ('buy' or 'sell') are required")
         if not math.isfinite(price) or price <= 0:
@@ -49,7 +53,7 @@ class TradingEngine:
             self.broker.mark(symbol, price)
             self._roll_day()
             if action == "buy":
-                result = self._buy(symbol, price)
+                result = self._buy(symbol, price, crypto)
             else:
                 # Selling to close is always allowed, even when halted — it reduces risk.
                 result = self.broker.close(symbol, price)
@@ -57,17 +61,21 @@ class TradingEngine:
             self._journal(result)
             return result
 
-    def _buy(self, symbol, price):
+    def _buy(self, symbol, price, crypto):
         if self.halted_reason:
             raise Rejected(f"trading halted: {self.halted_reason}", status=409)
         if self._trades_today >= self.cfg.max_trades_per_day:
             raise Rejected("MAX_TRADES_PER_DAY reached", status=409)
         if self.broker.position_qty(symbol) > 0:
             return {"symbol": symbol, "side": "buy", "qty": 0, "note": "already in position"}
-        qty = math.floor(self.cfg.max_position_usd / price)
-        if qty < 1:
-            raise Rejected(f"MAX_POSITION_USD too small to buy one share at {price}", status=409)
-        result = self.broker.buy(symbol, qty, price)
+        if crypto:
+            # Crypto can be bought in fractions; round down to 6 decimals.
+            qty = math.floor(self.cfg.max_position_usd / price * 1e6) / 1e6
+        else:
+            qty = math.floor(self.cfg.max_position_usd / price)
+        if qty <= 0:
+            raise Rejected(f"MAX_POSITION_USD too small to buy {symbol} at {price}", status=409)
+        result = self.broker.buy(symbol, qty, price, crypto=crypto)
         self._trades_today += 1
         return result
 

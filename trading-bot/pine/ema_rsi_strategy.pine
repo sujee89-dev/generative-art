@@ -13,6 +13,9 @@
 //   3. Create an alert on this strategy: Condition = this script, "alert() function calls only".
 //      Webhook URL = https://<your-server>/webhook
 //   4. Set the "Webhook secret" input below to the same value as WEBHOOK_SECRET on the server.
+//
+// Works on stocks and crypto. For crypto, open the chart on the exchange your bot trades on
+// (e.g. BINANCE:BTCUSDT for Binance, COINBASE:BTCUSD for Alpaca) so the ticker names match.
 strategy("EMA/RSI Webhook Bot", overlay=true, initial_capital=10000,
      default_qty_type=strategy.percent_of_equity, default_qty_value=10,
      commission_type=strategy.commission.percent, commission_value=0.05)
@@ -38,7 +41,7 @@ plot(fast, "Fast EMA", color=color.teal)
 plot(slow, "Slow EMA", color=color.orange)
 
 msg(action) =>
-    '{"secret":"' + secret + '","symbol":"' + syminfo.ticker + '","action":"' + action + '","price":' + str.tostring(close) + '}'
+    '{"secret":"' + secret + '","symbol":"' + syminfo.ticker + '","type":"' + syminfo.type + '","action":"' + action + '","price":' + str.tostring(close) + '}'
 
 if longEntry
     strategy.entry("Long", strategy.long)

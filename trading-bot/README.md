@@ -1,6 +1,6 @@
 # TradingView Trading Bot
 
-Automates trades from TradingView chart signals:
+Automates stock and crypto trades from TradingView chart signals:
 
 ```
 TradingView chart ──(Pine Script alert)──▶ webhook ──▶ this bot ──▶ risk checks ──▶ broker
@@ -21,8 +21,19 @@ TradingView has no API for pulling chart data or signals. The supported way to a
 - **Buy:** in an uptrend, RSI crosses back up through 35 (buys the pullback).
 - **Sell:** the trend flips, RSI goes above 70, or the 3% stop-loss or 6% take-profit is hit.
 
-The strategy is long-only. Each alert sends JSON like
-`{"secret":"...","symbol":"AAPL","action":"buy","price":187.2}`.
+The strategy is long-only. It works on stock and crypto charts. Each alert sends JSON like
+`{"secret":"...","symbol":"BTCUSDT","type":"crypto","action":"buy","price":64210.5}`.
+
+## Supported brokers
+
+| `BROKER` | Markets | Practice mode (default) | Live (`LIVE_TRADING=true`) |
+|---|---|---|---|
+| `paper` | anything | built-in simulator, $10k fake cash | — |
+| `binance` | crypto (e.g. `BTCUSDT`) | Binance Spot **testnet** | api.binance.com |
+| `alpaca` | US stocks + crypto (e.g. `BTCUSD`) | Alpaca paper account | api.alpaca.markets |
+
+Stocks are bought in whole shares; crypto in fractions. On Binance the bot tracks the coins it
+bought itself (in `STATE_PATH`) and only ever sells those, so coins you already own are safe.
 
 ## Risk controls (enforced by the bot, whatever the alert says)
 
@@ -57,16 +68,34 @@ curl -X POST localhost:8080/webhook -H 'Content-Type: application/json' \
 curl localhost:8080/status
 ```
 
-### 2. Put it on the internet
+### 2. Deploy online (Render)
 
-TradingView webhooks need a public HTTPS URL on port 443 or 80. You can:
+TradingView webhooks need a public HTTPS URL. The repo includes a Render Blueprint
+(`render.yaml` at the repo root) that sets everything up. It costs about **$7/month**: the free
+plan sleeps when idle and would miss alerts.
 
-- deploy to a small VPS or a service such as Render, Railway or Fly.io, or
-- for testing, run `ngrok http 8080` and use the https URL it prints.
+1. Merge this branch into `main` (Render deploys `main` by default).
+2. Sign up at [render.com](https://render.com) with your GitHub account.
+3. Click **New → Blueprint**, pick this repository, and click **Apply**.
+4. Leave the key fields blank for now; the bot starts in `paper` mode.
+5. When it's live, open the service and copy:
+   - the URL, e.g. `https://tradingview-bot-xxxx.onrender.com`; your webhook is that plus `/webhook`
+   - **Environment → WEBHOOK_SECRET** (Render generated it); this goes into the Pine Script
+6. Check `https://<your-url>/status` in a browser.
+
+Trade logs and Binance positions are stored on a 1 GB disk at `/data`, so they survive restarts.
+The server is in Frankfurt because Binance refuses API calls from US servers.
+
+To change a setting later (broker, keys, limits), edit **Environment** in the Render dashboard;
+the bot restarts automatically.
+
+For quick local testing instead, run `ngrok http 8080` and use the https URL it prints.
 
 ### 3. Connect TradingView
 
-You need a TradingView plan that includes webhook alerts.
+Backtesting in the Strategy Tester works on the **free** plan. Webhook alerts need a **paid**
+plan and 2‑factor authentication turned on in your TradingView account. Only pay once the backtest
+looks good.
 
 1. Open the Pine Editor, paste `pine/ema_rsi_strategy.pine`, and click **Add to chart**.
 2. In the script's settings, set **Webhook secret** to your `WEBHOOK_SECRET`.
@@ -75,7 +104,18 @@ You need a TradingView plan that includes webhook alerts.
 4. Create an alert: set **Condition** to *EMA/RSI Webhook Bot* with *alert() function calls
    only*, and set **Notifications → Webhook URL** to `https://your-server/webhook`.
 
-### 4. Paper trade with a real broker (Alpaca)
+### 4a. Practice crypto trading on Binance
+
+1. Log in at [testnet.binance.vision](https://testnet.binance.vision) with GitHub and click
+   **Generate HMAC_SHA256 Key**. You get free test USDT and BTC.
+2. In Render → Environment, set `BROKER=binance`, `BINANCE_KEY=...` and `BINANCE_SECRET=...`.
+3. In TradingView, open a Binance chart such as `BINANCE:BTCUSDT` and create the alert on it.
+
+For live trading later: create an API key on binance.com with **only "Enable Spot Trading"** ticked
+(never withdrawals), restrict it to your Render server's outbound IPs (shown under
+**Connect → Outbound** in Render), and set `LIVE_TRADING=true`.
+
+### 4b. Practice stocks or crypto on Alpaca
 
 1. Create a free account at [alpaca.markets](https://alpaca.markets) and generate **paper**
    API keys.
@@ -87,10 +127,11 @@ You need a TradingView plan that includes webhook alerts.
    ```
 
    It uses Alpaca's paper endpoint, so orders are real simulated orders with fake money.
+   For crypto on Alpaca, use a `COINBASE:BTCUSD`-style chart so the ticker is `BTCUSD`.
 
 ### 5. Live trading (optional, at your own risk)
 
-Set `LIVE_TRADING=true` and use your **live** Alpaca keys. The bot logs `mode=LIVE MONEY` at
+Set `LIVE_TRADING=true` and use your **live** broker keys. The bot logs `mode=LIVE MONEY` at
 startup. Start with a small `MAX_POSITION_USD`.
 
 ## Tests
@@ -101,8 +142,9 @@ cd trading-bot && python -m unittest discover -s tests -t .
 
 ## Files
 
-- `bot/server.py`: HTTP server with `POST /webhook` and `GET /status`.
+- `bot/server.py`: HTTP server with `POST /webhook`, `GET /status` and `GET /health`.
 - `bot/engine.py`: alert validation, risk limits and the trade journal.
-- `bot/brokers.py`: `PaperBroker` (the simulator) and `AlpacaBroker`.
+- `bot/brokers.py`: `PaperBroker` (the simulator), `AlpacaBroker` and `BinanceBroker`.
 - `bot/config.py`: settings read from environment variables.
 - `pine/ema_rsi_strategy.pine`: the TradingView strategy that generates the signals.
+- `Dockerfile`, `../render.yaml`: deployment.

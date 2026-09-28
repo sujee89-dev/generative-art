@@ -6,7 +6,7 @@ import json
 import logging
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .brokers import AlpacaBroker, BrokerError, PaperBroker
+from .brokers import AlpacaBroker, BinanceBroker, BrokerError, PaperBroker
 from .config import Config
 from .engine import Rejected, TradingEngine
 
@@ -25,7 +25,9 @@ def make_handler(engine):
             self.wfile.write(data)
 
         def do_GET(self):
-            if self.path == "/status":
+            if self.path == "/health":
+                self._send(200, {"ok": True})
+            elif self.path == "/status":
                 self._send(200, engine.status())
             else:
                 self._send(404, {"error": "not found"})
@@ -59,6 +61,8 @@ def make_handler(engine):
 def build_engine(cfg):
     if cfg.broker == "alpaca":
         broker = AlpacaBroker(cfg.alpaca_key, cfg.alpaca_secret, cfg.alpaca_base_url)
+    elif cfg.broker == "binance":
+        broker = BinanceBroker(cfg.binance_key, cfg.binance_secret, cfg.binance_base_url, cfg.state_path)
     else:
         broker = PaperBroker(cfg.paper_starting_cash)
     return TradingEngine(cfg, broker)
@@ -68,7 +72,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = Config.from_env()
     engine = build_engine(cfg)
-    mode = "LIVE MONEY" if (cfg.broker == "alpaca" and cfg.live_trading) else "paper/simulated"
+    mode = "LIVE MONEY" if (cfg.broker != "paper" and cfg.live_trading) else "paper/simulated"
     log.info("broker=%s mode=%s listening on :%d", cfg.broker, mode, cfg.port)
     ThreadingHTTPServer(("0.0.0.0", cfg.port), make_handler(engine)).serve_forever()
 
