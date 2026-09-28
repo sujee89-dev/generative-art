@@ -1,5 +1,7 @@
 """Reads the daily chart itself and trades the Trend (200 SMA) strategy, no TradingView needed.
 
+Works for crypto (Kraken candles) and stocks (see stockdata.py) — pass the matching `fetch`.
+
 Same rule as "Trend (200 SMA)" in pine/trend_breakout_strategy.pine, on completed daily candles:
   - flat and close > 200-day SMA                  -> buy
   - holding and close < 200-day SMA * (1 - buffer) -> sell
@@ -51,13 +53,15 @@ def trend_signal(closes, holding, sma_len=200, exit_buffer=0.03):
 
 class AutoTrader:
     def __init__(self, engine, symbol, sma_len=200, exit_buffer=0.03, interval_s=3600,
-                 fetch=fetch_kraken_daily_candles):
+                 fetch=fetch_kraken_daily_candles, crypto=True, market_open=None):
         self.engine = engine
         self.symbol = symbol
         self.sma_len = sma_len
         self.exit_buffer = exit_buffer
         self.interval_s = interval_s
         self._fetch = fetch
+        self.crypto = crypto
+        self._market_open = market_open  # e.g. stockdata.us_market_open; None = always open (crypto)
         self._last_candle = None
         self._stop = threading.Event()
 
@@ -68,7 +72,10 @@ class AutoTrader:
             candles = self._fetch(self.symbol)
         except BrokerError as e:
             log.error("auto-trader: %s", e)
-            self.engine.auto_status = {"checked_at": now, "error": str(e)}
+            self.engine.auto_status[self.symbol] = {"checked_at": now, "error": str(e)}
+            return None
+        if not candles:
+            self.engine.auto_status[self.symbol] = {"checked_at": now, "error": "no completed candles"}
             return None
         candle_time, close = candles[-1]
         if candle_time == self._last_candle:
@@ -85,9 +92,14 @@ class AutoTrader:
             "signal": action,
         }
         result = None
+        if action and self._market_open and not self._market_open():
+            # Act on this candle at the first check after the market opens.
+            status["waiting"] = "market closed"
+            self.engine.auto_status[self.symbol] = status
+            return None
         if action:
             try:
-                result = self.engine.execute(self.symbol, action, close, crypto=True)
+                result = self.engine.execute(self.symbol, action, close, crypto=self.crypto)
                 log.info("auto-trader %s: %s", action, result)
             except Rejected as e:
                 log.error("auto-trader %s refused: %s", action, e)
@@ -96,11 +108,11 @@ class AutoTrader:
                 # Probably temporary (network, exchange): retry at the next check.
                 log.error("auto-trader %s failed, will retry: %s", action, e)
                 status["error"] = str(e)
-                self.engine.auto_status = status
+                self.engine.auto_status[self.symbol] = status
                 return None
         self._last_candle = candle_time
         status["result"] = result
-        self.engine.auto_status = status
+        self.engine.auto_status[self.symbol] = status
         return result
 
     def run(self):

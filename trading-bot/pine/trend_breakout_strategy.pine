@@ -17,6 +17,7 @@
 //   2022–Sep 2026 (never tuned on):     Trend +218.8%, max drawdown 21.2%, 4/10 winners,
 //                                       vs about +100% buy and hold (with a ~65% crash).
 // Trend (200 SMA) is therefore the default.
+// The volume filter is under test; it goes live only if it beats this on BOTH periods above.
 //
 // Honest testing: pick the style using an early period ("Only trade from" 2016 and
 // "Stop trading at" 2022-01-01). Then check that style once on 2022 to today, which it was never
@@ -33,6 +34,11 @@ exitLen  = input.int(10, "Breakout: exit at lowest low of last N bars")
 trendLen = input.int(200, "Trend SMA length")
 fastLen  = input.int(50, "Golden cross: fast SMA length")
 bufferPct = input.float(3.0, "Trend exit buffer %") / 100
+// Volume filter (off by default = the live bot's rule): only BUY on a day whose volume is above
+// its N-day average, i.e. the move has more trading behind it than usual. Sells are unaffected.
+volFilter = input.bool(false, "Volume filter: only buy on above-average volume")
+volLen    = input.int(20, "Volume filter: average length (days)")
+volMult   = input.float(1.0, "Volume filter: volume must exceed average ×")
 secret   = input.string("change-me", "Webhook secret")
 // Test windows (a free alternative to the Strategy Tester's paid custom date range).
 startAt  = input.time(timestamp("2015-01-01"), "Only trade from this date")
@@ -57,7 +63,9 @@ else
 
 inWindow  = time >= startAt and time < endAt
 flat      = strategy.position_size == 0
-longEntry = inWindow and flat and wantIn and not na(trend)
+volAvg    = ta.sma(volume, volLen)
+volOk     = not volFilter or volume > volAvg * volMult
+longEntry = inWindow and flat and wantIn and volOk and not na(trend)
 longExit  = not flat and wantOut
 
 plot(mode == "Breakout" ? upper : na, "Breakout level", color=color.teal)

@@ -3,3 +3,4 @@ __pycache__/
 trades.jsonl
 .env
 positions.json
+stock_positions.json

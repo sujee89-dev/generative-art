@@ -1,6 +1,6 @@
 """Settings loaded from environment variables."""
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 ALPACA_PAPER_URL = "https://paper-api.alpaca.markets"
 ALPACA_LIVE_URL = "https://api.alpaca.markets"
@@ -34,6 +34,16 @@ class Config:
     trend_sma: int = 200
     trend_exit_buffer_pct: float = 3.0
     auto_check_minutes: int = 60
+    # Stock bot: the same Trend (200 SMA) rule on US stocks/ETFs through Interactive Brokers.
+    stock_symbols: list = field(default_factory=list)  # e.g. ["SPY", "QQQ"]; empty = off
+    stock_position_usd: float = 1000.0  # USD spent per stock buy (whole shares)
+    stock_max_daily_loss_usd: float = 500.0
+    ibkr_host: str = "127.0.0.1"
+    ibkr_port: int = 4004  # IB Gateway paper port in the ib-gateway Docker image
+    ibkr_client_id: int = 1
+    ibkr_live: bool = False
+    stock_journal_path: str = "stock_trades.jsonl"
+    stock_state_path: str = "stock_positions.json"
 
     @classmethod
     def from_env(cls, env=os.environ):
@@ -62,6 +72,15 @@ class Config:
             trend_sma=int(env.get("TREND_SMA", 200)),
             trend_exit_buffer_pct=float(env.get("TREND_EXIT_BUFFER_PCT", 3)),
             auto_check_minutes=int(env.get("AUTO_CHECK_MINUTES", 60)),
+            stock_symbols=[x.strip().upper() for x in env.get("STOCK_SYMBOLS", "").split(",") if x.strip()],
+            stock_position_usd=float(env.get("STOCK_POSITION_USD", 1000)),
+            stock_max_daily_loss_usd=float(env.get("STOCK_MAX_DAILY_LOSS_USD", 500)),
+            ibkr_host=env.get("IBKR_HOST", "127.0.0.1"),
+            ibkr_port=int(env.get("IBKR_PORT", 4004)),
+            ibkr_client_id=int(env.get("IBKR_CLIENT_ID", 1)),
+            ibkr_live=env.get("IBKR_LIVE", "").lower() == "true",
+            stock_journal_path=env.get("STOCK_JOURNAL_PATH", "stock_trades.jsonl"),
+            stock_state_path=env.get("STOCK_STATE_PATH", "stock_positions.json"),
         )
         # Real money only when explicitly requested.
         cfg.alpaca_base_url = ALPACA_LIVE_URL if cfg.live_trading else ALPACA_PAPER_URL
@@ -81,3 +100,11 @@ class Config:
                 raise ValueError("Kraken has no practice mode: use BROKER=paper to practise, "
                                  "or set LIVE_TRADING=true to trade real money on Kraken")
         return cfg
+
+    def stock_engine_config(self):
+        """Settings for the separate stock engine (its own limits, journal and positions file)."""
+        return replace(self, broker="ibkr", live_trading=self.ibkr_live,
+                       max_position_usd=self.stock_position_usd,
+                       max_daily_loss_usd=self.stock_max_daily_loss_usd,
+                       journal_path=self.stock_journal_path, state_path=self.stock_state_path,
+                       allowed_symbols=set(self.stock_symbols))

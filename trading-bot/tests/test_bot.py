@@ -14,6 +14,9 @@ from http.server import ThreadingHTTPServer
 from bot.brokers import BrokerError, AlpacaBroker, BinanceBroker, KrakenBroker, PaperBroker, split_pair
 from bot.autotrader import AutoTrader, fetch_kraken_daily_candles, trend_signal
 from bot.config import Config
+from bot.ibkr import IBKRBroker
+from bot.server import safe_status
+from bot.stockdata import fetch_stock_daily_candles, us_market_open
 from bot.engine import Rejected, TradingEngine
 from bot.server import make_handler
 
@@ -227,7 +230,7 @@ class AutoTraderTests(unittest.TestCase):
         trader = AutoTrader(engine, "BTCCAD", fetch=lambda s: candles)
         self.assertEqual(trader.check()["side"], "buy")
         self.assertIsNone(trader.check())  # same candle: nothing more to do
-        self.assertEqual(engine.auto_status["signal"], "buy")
+        self.assertEqual(engine.auto_status["BTCCAD"]["signal"], "buy")
         candles.append((200 * 86400, 80.0))  # next day closes well below the SMA
         self.assertEqual(trader.check()["side"], "sell")
         self.assertEqual(engine.broker.position_qty("BTCCAD"), 0)
@@ -239,7 +242,7 @@ class AutoTraderTests(unittest.TestCase):
         real_buy = engine.broker.buy
         engine.broker.buy = lambda *a, **k: (_ for _ in ()).throw(BrokerError("timeout"))
         self.assertIsNone(trader.check())
-        self.assertIn("timeout", engine.auto_status["error"])
+        self.assertIn("timeout", engine.auto_status["BTCCAD"]["error"])
         engine.broker.buy = real_buy
         self.assertEqual(trader.check()["side"], "buy")
 
@@ -248,7 +251,111 @@ class AutoTraderTests(unittest.TestCase):
         def boom(symbol):
             raise BrokerError("Kraken down")
         AutoTrader(engine, "BTCCAD", fetch=boom).check()
-        self.assertEqual(engine.status()["auto_trader"]["error"], "Kraken down")
+        self.assertEqual(engine.status()["auto_trader"]["BTCCAD"]["error"], "Kraken down")
+
+
+class FakeGateway:
+    def __init__(self, account="DU123", fill=None):
+        self.account, self.orders, self.shares = account, [], 0
+        self.fill = fill  # None = fill everything
+
+    def account_id(self):
+        return self.account
+
+    def net_liquidation(self):
+        return 1_000_000.0
+
+    def position(self, symbol):
+        return self.shares
+
+    def market_order(self, symbol, side, qty):
+        filled = qty if self.fill is None else self.fill
+        self.orders.append((symbol, side, qty))
+        self.shares += filled if side == "BUY" else -filled
+        return len(self.orders), filled, 500.0
+
+
+def ny(y, m, d, hh, mm):
+    from zoneinfo import ZoneInfo
+    return dt.datetime(y, m, d, hh, mm, tzinfo=ZoneInfo("America/New_York"))
+
+
+class StockTests(unittest.TestCase):
+    CSV = "Date,Open,High,Low,Close,Volume\n2026-09-24,1,1,1,500.5,9\n2026-09-25,1,1,1,501.5,9\n2026-09-28,1,1,1,999,9\n"
+
+    def test_stooq_drops_today_until_market_done(self):
+        def opener(req, timeout=None):
+            self.assertIn("s=spy.us", req.full_url)
+            return io.BytesIO(self.CSV.encode())
+        during = fetch_stock_daily_candles("SPY", opener=opener, now=ny(2026, 9, 28, 15, 0))
+        self.assertEqual([c for _, c in during], [500.5, 501.5])
+        after = fetch_stock_daily_candles("SPY", opener=opener, now=ny(2026, 9, 28, 17, 0))
+        self.assertEqual([c for _, c in after], [500.5, 501.5, 999.0])
+
+    def test_falls_back_to_yahoo(self):
+        yahoo = {"chart": {"result": [{"timestamp": [int(ny(2026, 9, 25, 9, 30).timestamp())],
+                                        "indicators": {"quote": [{"close": [123.4]}]}}]}}
+        def opener(req, timeout=None):
+            if "stooq" in req.full_url:
+                return io.BytesIO(b"No data")
+            return io.BytesIO(json.dumps(yahoo).encode())
+        self.assertEqual([c for _, c in fetch_stock_daily_candles("NVDA", opener=opener)], [123.4])
+
+    def test_no_data_is_a_broker_error(self):
+        def opener(req, timeout=None):
+            raise urllib.error.URLError("down")
+        with self.assertRaisesRegex(BrokerError, "no price data for SPY"):
+            fetch_stock_daily_candles("SPY", opener=opener)
+
+    def test_market_hours(self):
+        self.assertTrue(us_market_open(ny(2026, 9, 28, 9, 30)))
+        self.assertFalse(us_market_open(ny(2026, 9, 28, 16, 0)))
+        self.assertFalse(us_market_open(ny(2026, 9, 26, 12, 0)))  # Saturday
+
+    def test_ibkr_buys_whole_shares_and_sells_only_its_own(self):
+        state = os.path.join(tempfile.mkdtemp(), "stock_positions.json")
+        gw = FakeGateway()
+        gw.shares = 50  # shares you already owned
+        broker = IBKRBroker(gw, state)
+        self.assertEqual(broker.buy("MSFT", 2.0, 500.0)["qty"], 2)
+        broker = IBKRBroker(gw, state)  # restart keeps the bot's position
+        self.assertEqual(broker.position_qty("MSFT"), 2)
+        self.assertEqual(broker.close("MSFT", 510.0)["qty"], 2)
+        self.assertEqual(gw.shares, 50)
+        self.assertEqual(gw.orders, [("MSFT", "BUY", 2), ("MSFT", "SELL", 2)])
+
+    def test_ibkr_refuses_live_account_unless_enabled(self):
+        broker = IBKRBroker(FakeGateway(account="U999"), os.path.join(tempfile.mkdtemp(), "s.json"))
+        with self.assertRaisesRegex(BrokerError, "live account"):
+            broker.buy("SPY", 1, 600.0)
+        live = IBKRBroker(FakeGateway(account="U999"), os.path.join(tempfile.mkdtemp(), "s.json"), live=True)
+        self.assertEqual(live.buy("SPY", 1, 600.0)["qty"], 1)
+
+    def test_ibkr_unfilled_order_is_an_error_and_records_nothing(self):
+        broker = IBKRBroker(FakeGateway(fill=0), os.path.join(tempfile.mkdtemp(), "s.json"))
+        with self.assertRaisesRegex(BrokerError, "did not fill"):
+            broker.buy("SPY", 1, 600.0)
+        self.assertEqual(broker.position_qty("SPY"), 0)
+
+    def test_stock_autotrader_waits_for_market_open(self):
+        engine, _ = make_engine(max_position_usd=1000)
+        engine.broker = IBKRBroker(FakeGateway(), os.path.join(tempfile.mkdtemp(), "s.json"))
+        candles = [(i * 86400, 100.0) for i in range(199)] + [(199 * 86400, 110.0)]
+        is_open = {"v": False}
+        trader = AutoTrader(engine, "SPY", fetch=lambda s: candles, crypto=False,
+                            market_open=lambda: is_open["v"])
+        self.assertIsNone(trader.check())
+        self.assertEqual(engine.auto_status["SPY"]["waiting"], "market closed")
+        is_open["v"] = True
+        self.assertEqual(trader.check()["qty"], 9)  # whole shares: 1000 / 110
+        self.assertIsNone(trader.check())
+
+    def test_safe_status_reports_gateway_errors(self):
+        engine, _ = make_engine()
+        def down():
+            raise BrokerError("IBKR: ConnectionRefusedError")
+        engine.broker.equity = down
+        self.assertIn("ConnectionRefused", safe_status(engine)["error"])
 
 
 class ConfigTests(unittest.TestCase):
@@ -273,6 +380,14 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual((cfg.auto_trade_symbol, cfg.trend_sma, cfg.trend_exit_buffer_pct), ("BTCCAD", 200, 3.0))
         with self.assertRaisesRegex(ValueError, "AUTO_TRADE_SYMBOL"):
             Config.from_env(dict(env, BROKER="alpaca", ALPACA_KEY="k", ALPACA_SECRET="s"))
+
+    def test_stock_settings(self):
+        cfg = Config.from_env({"WEBHOOK_SECRET": SECRET, "STOCK_SYMBOLS": "spy, nvda,", "STOCK_POSITION_USD": "2000"})
+        scfg = cfg.stock_engine_config()
+        self.assertEqual(cfg.stock_symbols, ["SPY", "NVDA"])
+        self.assertEqual((scfg.broker, scfg.live_trading, scfg.max_position_usd), ("ibkr", False, 2000.0))
+        self.assertEqual((scfg.journal_path, scfg.allowed_symbols), ("stock_trades.jsonl", {"SPY", "NVDA"}))
+        self.assertEqual(cfg.broker, "paper")  # crypto side untouched
 
     def test_binance_testnet_unless_live(self):
         env = {"WEBHOOK_SECRET": SECRET, "BROKER": "binance", "BINANCE_KEY": "k", "BINANCE_SECRET": "s"}

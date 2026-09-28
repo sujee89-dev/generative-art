@@ -25,7 +25,7 @@ class TradingEngine:
         self._day_start_equity = None
         self._trades_today = 0
         self.halted_reason = None
-        self.auto_status = None  # last AutoTrader check, shown on /status
+        self.auto_status = {}  # symbol -> last AutoTrader check, shown on /status
 
     def handle_alert(self, payload):
         """Validate and act on one alert. Returns a dict describing what happened."""
@@ -109,5 +109,5 @@ class TradingEngine:
                 "day_start_equity": self._day_start_equity,
                 "trades_today": self._trades_today,
                 "halted": self.halted_reason,
-                "auto_trader": self.auto_status,
+                "auto_trader": self.auto_status or None,
             }
