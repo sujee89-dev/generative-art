@@ -1,0 +1,47 @@
+//@version=5
+// Trend breakout strategy that sends webhook alerts to the trading bot.
+//
+// Built for the DAILY (1D) chart, or 4h at the shortest. It trades rarely and lets winners run,
+// so fees are a small part of each trade (unlike short-timeframe strategies, where they
+// swallow most of the edge).
+//
+// How it "reads the chart":
+//   - Trend filter: only buy while price is above its 200-bar average (long-term uptrend)
+//   - Buy:  the bar closes above the highest high of the previous 20 bars (a breakout)
+//   - Sell: the bar closes below the lowest low of the previous 10 bars
+//           (a trailing exit that rises as price rises, with no fixed take-profit cap)
+//
+// Setup is the same as ema_rsi_strategy.pine: add it to a KRAKEN:BTCCAD 1D chart, compare it
+// with "Buy & hold" in the Strategy Tester, and only create the webhook alert if it clearly wins.
+//
+// commission_value=0.4 (%) is about Kraken's market-order fee for small accounts.
+strategy("Trend Breakout Webhook Bot", overlay=true, initial_capital=10000,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.4)
+
+entryLen = input.int(20, "Breakout: highest high of last N bars")
+exitLen  = input.int(10, "Exit: lowest low of last N bars")
+trendLen = input.int(200, "Trend filter: SMA length")
+secret   = input.string("change-me", "Webhook secret")
+
+upper = ta.highest(high, entryLen)[1]
+lower = ta.lowest(low, exitLen)[1]
+trend = ta.sma(close, trendLen)
+
+longEntry = strategy.position_size == 0 and close > upper and close > trend
+longExit  = strategy.position_size > 0 and close < lower
+
+plot(upper, "Breakout level", color=color.teal)
+plot(lower, "Exit level", color=color.red)
+plot(trend, "Trend SMA", color=color.orange, linewidth=2)
+
+msg(action) =>
+    '{"secret":"' + secret + '","symbol":"' + syminfo.ticker + '","type":"' + syminfo.type + '","action":"' + action + '","price":' + str.tostring(close) + '}'
+
+if longEntry
+    strategy.entry("Long", strategy.long)
+    alert(msg("buy"), alert.freq_once_per_bar_close)
+
+if longExit
+    strategy.close("Long")
+    alert(msg("sell"), alert.freq_once_per_bar_close)

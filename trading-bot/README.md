@@ -15,13 +15,19 @@ TradingView chart ──(Pine Script alert)──▶ webhook ──▶ this bot 
 
 TradingView has no API for pulling chart data or signals. The supported way to automate it is a
 **Pine Script** strategy that runs on TradingView's servers, analyses each bar, and fires a
-**webhook alert** when it wants to trade. `pine/ema_rsi_strategy.pine` is a starter strategy:
+**webhook alert** when it wants to trade. There are two strategies in `pine/`:
 
-- **Trend:** 20 EMA above 50 EMA means an uptrend.
-- **Buy:** in an uptrend, RSI crosses back up through 35 (buys the pullback).
-- **Sell:** the trend flips, RSI goes above 70, or the 3% stop-loss or 6% take-profit is hit.
+- **`trend_breakout_strategy.pine`** (try this first, on the **daily** chart): buys when price
+  closes above its 20-bar high while above the 200-bar average, and sells when it closes below
+  its 10-bar low. It trades rarely and lets winners run, so fees matter less.
+- **`ema_rsi_strategy.pine`**: buys RSI pullbacks in an EMA uptrend with a 3% stop and 6% target.
+  On `KRAKEN:BTCCAD` 1h (Dec 2024–Sep 2026) it **lost 2.5%**: 2 winners out of 26 trades, with
+  fees making up most of the loss. It's kept as an example of what the Strategy Tester is for.
 
-The strategy is long-only. It works on stock and crypto charts. Each alert sends JSON like
+Always compare a strategy with **Buy & hold** in the Strategy Tester. If it doesn't beat simply
+holding the coin, after fees, it isn't worth running.
+
+Both strategies are long-only. It works on stock and crypto charts. Each alert sends JSON like
 `{"secret":"...","symbol":"BTCUSDT","type":"crypto","action":"buy","price":64210.5}`.
 
 ## Supported brokers
@@ -107,7 +113,7 @@ Backtesting in the Strategy Tester works on the **free** plan. Webhook alerts ne
 plan and 2‑factor authentication turned on in your TradingView account. Only pay once the backtest
 looks good.
 
-1. Open the Pine Editor, paste `pine/ema_rsi_strategy.pine`, and click **Add to chart**.
+1. Open the Pine Editor, paste `pine/trend_breakout_strategy.pine`, and click **Add to chart**.
 2. In the script's settings, set **Webhook secret** to your `WEBHOOK_SECRET`.
 3. Check the **Strategy Tester** tab. If the backtest isn't profitable on your symbol and
    timeframe, adjust it or pick another one before going further.
@@ -172,5 +178,5 @@ cd trading-bot && python -m unittest discover -s tests -t .
 - `bot/engine.py`: alert validation, risk limits and the trade journal.
 - `bot/brokers.py`: `PaperBroker` (the simulator), `AlpacaBroker`, `BinanceBroker` and `KrakenBroker`.
 - `bot/config.py`: settings read from environment variables.
-- `pine/ema_rsi_strategy.pine`: the TradingView strategy that generates the signals.
+- `pine/trend_breakout_strategy.pine`, `pine/ema_rsi_strategy.pine`: the TradingView strategies that generate the signals.
 - `Dockerfile`, `../render.yaml`: deployment.
