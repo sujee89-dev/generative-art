@@ -31,9 +31,19 @@ The strategy is long-only. It works on stock and crypto charts. Each alert sends
 | `paper` | anything | built-in simulator, $10k fake cash | — |
 | `binance` | crypto (e.g. `BTCUSDT`) | Binance Spot **testnet** | api.binance.com |
 | `alpaca` | US stocks + crypto (e.g. `BTCUSD`) | Alpaca paper account | api.alpaca.markets |
+| `kraken` | crypto (e.g. `BTCCAD`) | none: practise with `paper` | api.kraken.com |
 
-Stocks are bought in whole shares; crypto in fractions. On Binance the bot tracks the coins it
-bought itself (in `STATE_PATH`) and only ever sells those, so coins you already own are safe.
+### Which broker to use in Canada
+
+- **Crypto: Kraken.** It's registered with Canadian securities regulators in every province.
+  Binance left Canada in 2023. Trade CAD pairs such as `KRAKEN:BTCCAD`.
+- **Practice:** `BROKER=paper` (the built-in simulator) on `KRAKEN:BTCCAD` charts, or an Alpaca
+  paper account, which Canadians can open even though Alpaca doesn't offer them live accounts.
+- **Stocks with real money:** not supported yet. Interactive Brokers is the usual choice with an
+  API that works in Canada; Wealthsimple and Questrade don't let bots place orders.
+
+Stocks are bought in whole shares; crypto in fractions. On Binance and Kraken the bot tracks the
+coins it bought itself (in `STATE_PATH`) and only ever sells those, so coins you already own are safe.
 
 ## Risk controls (enforced by the bot, whatever the alert says)
 
@@ -84,7 +94,7 @@ plan sleeps when idle and would miss alerts.
 6. Check `https://<your-url>/status` in a browser.
 
 Trade logs and Binance positions are stored on a 1 GB disk at `/data`, so they survive restarts.
-The server is in Frankfurt because Binance refuses API calls from US servers.
+The server runs in Render's Ohio region, the closest to Canada.
 
 To change a setting later (broker, keys, limits), edit **Environment** in the Render dashboard;
 the bot restarts automatically.
@@ -104,7 +114,23 @@ looks good.
 4. Create an alert: set **Condition** to *EMA/RSI Webhook Bot* with *alert() function calls
    only*, and set **Notifications → Webhook URL** to `https://your-server/webhook`.
 
-### 4a. Practice crypto trading on Binance
+### 4. Crypto on Kraken (Canada)
+
+1. Practise first: keep `BROKER=paper` and point your TradingView alert at a `KRAKEN:BTCCAD`
+   chart. Watch `/status` and `trades.jsonl` for a few weeks.
+2. When you're ready for real money, open and verify a Kraken account and deposit a small amount
+   of CAD.
+3. Create an API key under **Settings → API** with **only** *Query Funds* and *Create & Modify
+   Orders* ticked. Never tick withdrawals.
+4. In Render → Environment, set `BROKER=kraken`, `KRAKEN_KEY=...`, `KRAKEN_SECRET=...` and
+   `LIVE_TRADING=true`. The bot refuses to start with Kraken unless `LIVE_TRADING=true`, because
+   Kraken has no practice mode.
+
+Set `MAX_POSITION_USD` and `MAX_DAILY_LOSS_USD` in CAD when you trade CAD pairs; the bot doesn't
+convert currencies. Market orders on Kraken cost about 0.4% each way, so a trade has to move more
+than about 0.8% just to break even. The Pine Script's backtest already charges that.
+
+### 4a. Practice crypto trading on Binance (not available in Canada)
 
 1. Log in at [testnet.binance.vision](https://testnet.binance.vision) with GitHub and click
    **Generate HMAC_SHA256 Key**. You get free test USDT and BTC.
@@ -115,7 +141,7 @@ For live trading later: create an API key on binance.com with **only "Enable Spo
 (never withdrawals), restrict it to your Render server's outbound IPs (shown under
 **Connect → Outbound** in Render), and set `LIVE_TRADING=true`.
 
-### 4b. Practice stocks or crypto on Alpaca
+### 4b. Practice stocks or crypto on Alpaca (paper only in Canada)
 
 1. Create a free account at [alpaca.markets](https://alpaca.markets) and generate **paper**
    API keys.
@@ -144,7 +170,7 @@ cd trading-bot && python -m unittest discover -s tests -t .
 
 - `bot/server.py`: HTTP server with `POST /webhook`, `GET /status` and `GET /health`.
 - `bot/engine.py`: alert validation, risk limits and the trade journal.
-- `bot/brokers.py`: `PaperBroker` (the simulator), `AlpacaBroker` and `BinanceBroker`.
+- `bot/brokers.py`: `PaperBroker` (the simulator), `AlpacaBroker`, `BinanceBroker` and `KrakenBroker`.
 - `bot/config.py`: settings read from environment variables.
 - `pine/ema_rsi_strategy.pine`: the TradingView strategy that generates the signals.
 - `Dockerfile`, `../render.yaml`: deployment.

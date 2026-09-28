@@ -8,8 +8,9 @@ services:
     # Starter never sleeps. The free plan sleeps when idle, and TradingView gives up on a
     # webhook after a few seconds, so alerts would be lost while it wakes up.
     plan: starter
-    # Binance blocks API calls from US servers, so don't use a US region.
-    region: frankfurt
+    # Closest Render region to Canada. (If you ever use Binance, change to frankfurt:
+    # Binance blocks API calls from US servers.)
+    region: ohio
     healthCheckPath: /health
     disk:
       name: bot-data
@@ -32,6 +33,10 @@ services:
         value: /data/trades.jsonl
       - key: STATE_PATH
         value: /data/positions.json
+      - key: KRAKEN_KEY
+        sync: false
+      - key: KRAKEN_SECRET
+        sync: false
       - key: BINANCE_KEY
         sync: false
       - key: BINANCE_SECRET

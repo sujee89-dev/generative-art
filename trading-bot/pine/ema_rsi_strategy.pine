@@ -15,10 +15,14 @@
 //   4. Set the "Webhook secret" input below to the same value as WEBHOOK_SECRET on the server.
 //
 // Works on stocks and crypto. For crypto, open the chart on the exchange your bot trades on
-// (e.g. BINANCE:BTCUSDT for Binance, COINBASE:BTCUSD for Alpaca) so the ticker names match.
+// (e.g. KRAKEN:BTCCAD for Kraken, BINANCE:BTCUSDT for Binance, COINBASE:BTCUSD for Alpaca)
+// so the ticker names match.
+//
+// commission_value=0.4 (%) is about Kraken's market-order fee for small accounts. Keep it realistic,
+// or the backtest will look better than real trading.
 strategy("EMA/RSI Webhook Bot", overlay=true, initial_capital=10000,
      default_qty_type=strategy.percent_of_equity, default_qty_value=10,
-     commission_type=strategy.commission.percent, commission_value=0.05)
+     commission_type=strategy.commission.percent, commission_value=0.4)
 
 fastLen    = input.int(20, "Fast EMA")
 slowLen    = input.int(50, "Slow EMA")

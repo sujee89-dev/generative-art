@@ -1,5 +1,6 @@
 """Broker adapters. Each broker supports: buy(symbol, qty, price, crypto), close(symbol, price),
 position_qty(symbol), mark(symbol, price), equity()."""
+import base64
 import hashlib
 import hmac
 import json
@@ -11,7 +12,7 @@ import urllib.request
 from decimal import Decimal
 
 # Quote currencies recognised at the end of a TradingView crypto ticker (longest match first).
-QUOTES = ("FDUSD", "USDT", "USDC", "USD", "EUR", "BTC", "ETH")
+QUOTES = ("FDUSD", "USDT", "USDC", "USD", "CAD", "EUR", "BTC", "ETH")
 STABLECOINS = ("USDT", "USDC", "FDUSD", "USD")
 
 
@@ -211,4 +212,119 @@ class BinanceBroker:
         """Stablecoin cash plus the bot's own coins at their last alert price."""
         balances = self._balances()
         cash = sum(balances.get(c, 0) for c in STABLECOINS)
+        return cash + sum(q * self.last_price.get(s, 0) for s, q in self.held.items())
+
+
+class KrakenBroker:
+    """Kraken spot API (crypto, available in Canada). Kraken has no practice environment,
+    so this is only used with LIVE_TRADING=true; practise with BROKER=paper first.
+
+    Like BinanceBroker, it only sells coins the bot bought itself (tracked in state_path).
+    """
+
+    ALIASES = {"BTC": "XBT", "DOGE": "XDG"}  # Kraken's names for some coins
+    CASH = ("ZCAD", "ZUSD", "USDC", "USDT")
+
+    def __init__(self, key, secret, state_path, base_url="https://api.kraken.com",
+                 opener=urllib.request.urlopen, clock=time.time):
+        self.base_url = base_url.rstrip("/")
+        self.key = key
+        self.secret = secret
+        self.state_path = state_path
+        self._open = opener
+        self._clock = clock
+        self._nonce = 0
+        self._info = {}
+        self.last_price = {}
+        self.held = {}
+        if os.path.exists(state_path):
+            with open(state_path) as f:
+                self.held = json.load(f)
+
+    _save = BinanceBroker._save
+
+    def sign(self, path, postdata, nonce):
+        message = path.encode() + hashlib.sha256((str(nonce) + postdata).encode()).digest()
+        mac = hmac.new(base64.b64decode(self.secret), message, hashlib.sha512)
+        return base64.b64encode(mac.digest()).decode()
+
+    def _request(self, path, params=None, private=False):
+        headers, data = {}, None
+        if private:
+            self._nonce = max(self._nonce + 1, int(self._clock() * 1000))
+            postdata = urllib.parse.urlencode(dict(params or {}, nonce=self._nonce))
+            headers = {"API-Key": self.key, "API-Sign": self.sign(path, postdata, self._nonce),
+                       "Content-Type": "application/x-www-form-urlencoded"}
+            data = postdata.encode()
+        elif params:
+            path += "?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(self.base_url + path, data=data, headers=headers,
+                                     method="POST" if private else "GET")
+        try:
+            with self._open(req, timeout=10) as resp:
+                body = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            raise BrokerError(f"Kraken {path} failed: {e.code} {e.read().decode(errors='replace')}")
+        except urllib.error.URLError as e:
+            raise BrokerError(f"Kraken {path} failed: {e.reason}")
+        if body.get("error"):
+            raise BrokerError(f"Kraken {path} failed: {', '.join(body['error'])}")
+        return body["result"]
+
+    def _symbol_info(self, symbol):
+        """'BTCCAD' -> (Kraken pair 'XBTCAD', base asset 'XXBT', lot size)."""
+        if symbol not in self._info:
+            base, quote = split_pair(symbol)
+            pair = self.ALIASES.get(base, base) + quote
+            info = next(iter(self._request("/0/public/AssetPairs", {"pair": pair}).values()))
+            self._info[symbol] = (info["altname"], info["base"], Decimal(1).scaleb(-info["lot_decimals"]))
+        return self._info[symbol]
+
+    def _order(self, symbol, side, qty):
+        pair, _, _ = self._symbol_info(symbol)
+        result = self._request("/0/private/AddOrder", {
+            "pair": pair, "type": side, "ordertype": "market", "volume": format(qty, "f"),
+        }, private=True)
+        return result["txid"][0]
+
+    def buy(self, symbol, qty, price, crypto=True):
+        _, _, lot = self._symbol_info(symbol)
+        volume = (Decimal(str(qty)) // lot) * lot
+        if volume <= 0:
+            raise BrokerError(f"order for {symbol} is below Kraken's lot size")
+        txid = self._order(symbol, "buy", volume)
+        # Kraken takes fees in the quote currency (CAD/USD), so we receive the full volume.
+        self.held[symbol] = self.held.get(symbol, 0) + float(volume)
+        self._save()
+        return {"symbol": symbol, "side": "buy", "qty": float(volume), "price": price, "order_id": txid}
+
+    def close(self, symbol, price):
+        held = self.held.get(symbol, 0)
+        if held <= 0:
+            return None
+        _, base, lot = self._symbol_info(symbol)
+        available = min(held, self._balances().get(base, 0))
+        volume = (Decimal(str(available)) // lot) * lot
+        if volume <= 0:
+            self.held.pop(symbol, None)
+            self._save()
+            return None
+        txid = self._order(symbol, "sell", volume)
+        self.held.pop(symbol, None)
+        self._save()
+        return {"symbol": symbol, "side": "sell", "qty": float(volume), "price": price, "order_id": txid}
+
+    def _balances(self):
+        return {asset: float(amount) for asset, amount in self._request("/0/private/Balance", private=True).items()}
+
+    def position_qty(self, symbol):
+        return self.held.get(symbol, 0)
+
+    def mark(self, symbol, price):
+        self.last_price[symbol] = price
+
+    def equity(self):
+        """Cash plus the bot's own coins at their last alert price (mixes CAD and USD if you hold both)."""
+        balances = self._balances()
+        cash = sum(balances.get(c, 0) for c in self.CASH)
         return cash + sum(q * self.last_price.get(s, 0) for s, q in self.held.items())

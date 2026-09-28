@@ -39,9 +39,10 @@ class TradingEngine:
             price = float(payload.get("price"))
         except (TypeError, ValueError):
             raise Rejected("price must be a number")
-        crypto = str(payload.get("type", "")).lower() == "crypto" or self.cfg.broker == "binance"
-        if self.cfg.broker == "binance" and payload.get("type") not in (None, "crypto"):
-            raise Rejected("Binance only trades crypto")
+        crypto_only = self.cfg.broker in ("binance", "kraken")
+        crypto = str(payload.get("type", "")).lower() == "crypto" or crypto_only
+        if crypto_only and payload.get("type") not in (None, "crypto"):
+            raise Rejected(f"{self.cfg.broker} only trades crypto")
         if not symbol or action not in ("buy", "sell"):
             raise Rejected("symbol and action ('buy' or 'sell') are required")
         if not math.isfinite(price) or price <= 0:

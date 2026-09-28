@@ -6,7 +6,7 @@ import json
 import logging
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .brokers import AlpacaBroker, BinanceBroker, BrokerError, PaperBroker
+from .brokers import AlpacaBroker, BinanceBroker, BrokerError, KrakenBroker, PaperBroker
 from .config import Config
 from .engine import Rejected, TradingEngine
 
@@ -63,6 +63,8 @@ def build_engine(cfg):
         broker = AlpacaBroker(cfg.alpaca_key, cfg.alpaca_secret, cfg.alpaca_base_url)
     elif cfg.broker == "binance":
         broker = BinanceBroker(cfg.binance_key, cfg.binance_secret, cfg.binance_base_url, cfg.state_path)
+    elif cfg.broker == "kraken":
+        broker = KrakenBroker(cfg.kraken_key, cfg.kraken_secret, cfg.state_path)
     else:
         broker = PaperBroker(cfg.paper_starting_cash)
     return TradingEngine(cfg, broker)

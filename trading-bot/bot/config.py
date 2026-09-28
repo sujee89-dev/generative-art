@@ -11,13 +11,15 @@ BINANCE_LIVE_URL = "https://api.binance.com"
 @dataclass
 class Config:
     webhook_secret: str
-    broker: str = "paper"  # "paper" (built-in simulator), "alpaca" or "binance"
+    broker: str = "paper"  # "paper" (built-in simulator), "alpaca", "binance" or "kraken"
     alpaca_key: str = ""
     alpaca_secret: str = ""
     alpaca_base_url: str = ALPACA_PAPER_URL
     binance_key: str = ""
     binance_secret: str = ""
     binance_base_url: str = BINANCE_TESTNET_URL
+    kraken_key: str = ""
+    kraken_secret: str = ""
     live_trading: bool = False
     max_position_usd: float = 1000.0
     max_daily_loss_usd: float = 200.0
@@ -40,6 +42,8 @@ class Config:
             alpaca_secret=env.get("ALPACA_SECRET", ""),
             binance_key=env.get("BINANCE_KEY", ""),
             binance_secret=env.get("BINANCE_SECRET", ""),
+            kraken_key=env.get("KRAKEN_KEY", ""),
+            kraken_secret=env.get("KRAKEN_SECRET", ""),
             live_trading=env.get("LIVE_TRADING", "").lower() == "true",
             max_position_usd=float(env.get("MAX_POSITION_USD", 1000)),
             max_daily_loss_usd=float(env.get("MAX_DAILY_LOSS_USD", 200)),
@@ -53,10 +57,16 @@ class Config:
         # Real money only when explicitly requested.
         cfg.alpaca_base_url = ALPACA_LIVE_URL if cfg.live_trading else ALPACA_PAPER_URL
         cfg.binance_base_url = BINANCE_LIVE_URL if cfg.live_trading else BINANCE_TESTNET_URL
-        if cfg.broker not in ("paper", "alpaca", "binance"):
-            raise ValueError("BROKER must be 'paper', 'alpaca' or 'binance'")
+        if cfg.broker not in ("paper", "alpaca", "binance", "kraken"):
+            raise ValueError("BROKER must be 'paper', 'alpaca', 'binance' or 'kraken'")
         if cfg.broker == "alpaca" and not (cfg.alpaca_key and cfg.alpaca_secret):
             raise ValueError("ALPACA_KEY and ALPACA_SECRET are required when BROKER=alpaca")
         if cfg.broker == "binance" and not (cfg.binance_key and cfg.binance_secret):
             raise ValueError("BINANCE_KEY and BINANCE_SECRET are required when BROKER=binance")
+        if cfg.broker == "kraken":
+            if not (cfg.kraken_key and cfg.kraken_secret):
+                raise ValueError("KRAKEN_KEY and KRAKEN_SECRET are required when BROKER=kraken")
+            if not cfg.live_trading:
+                raise ValueError("Kraken has no practice mode: use BROKER=paper to practise, "
+                                 "or set LIVE_TRADING=true to trade real money on Kraken")
         return cfg

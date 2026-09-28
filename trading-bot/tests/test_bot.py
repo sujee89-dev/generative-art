@@ -1,3 +1,4 @@
+import base64
 import datetime as dt
 import io
 import json
@@ -10,7 +11,7 @@ import urllib.parse
 import urllib.request
 from http.server import ThreadingHTTPServer
 
-from bot.brokers import AlpacaBroker, BinanceBroker, PaperBroker, split_pair
+from bot.brokers import BrokerError, AlpacaBroker, BinanceBroker, KrakenBroker, PaperBroker, split_pair
 from bot.config import Config
 from bot.engine import Rejected, TradingEngine
 from bot.server import make_handler
@@ -157,6 +158,49 @@ class BrokerTests(unittest.TestCase):
             engine.handle_alert(alert("buy", 100, type="stock"))
 
 
+class KrakenTests(unittest.TestCase):
+    def test_signature_matches_kraken_docs_example(self):
+        broker = KrakenBroker("k", "kQH5HW/8p1uGOVjbgWA7FunAmGO8lsSUXNsu3eow76sz84Q18fWxnyRzBHCd3pd5nE9qa99HAZtuZuj6F1huXg==",
+                              os.path.join(tempfile.mkdtemp(), "p.json"))
+        postdata = "nonce=1616492376594&ordertype=limit&pair=XBTUSD&price=37500&type=buy&volume=1.25"
+        self.assertEqual(broker.sign("/0/private/AddOrder", postdata, 1616492376594),
+                         "4/dpxb3iT4tp/ZCVEwSnEsLxx0bqyhLpdfOpc6fn7OR8+UClSV5n9E6aSS8MPtnRfp32bAb0nmbRn6H8ndwLUQ==")
+
+    def kraken(self, state_path):
+        http = FakeHTTP({
+            ("GET", "/0/public/AssetPairs"): {"error": [], "result": {"XXBTZCAD": {
+                "altname": "XBTCAD", "base": "XXBT", "lot_decimals": 8}}},
+            ("POST", "/0/private/Balance"): {"error": [], "result": {"ZCAD": "500.0", "XXBT": "0.5"}},
+            ("POST", "/0/private/AddOrder"): {"error": [], "result": {"txid": ["OABC"]}},
+        })
+        return KrakenBroker("k", base64.b64encode(b"secret").decode(), state_path, opener=http, clock=lambda: 1), http
+
+    def test_buy_and_sell_only_own_coins(self):
+        state = os.path.join(tempfile.mkdtemp(), "positions.json")
+        broker, http = self.kraken(state)
+        broker.buy("BTCCAD", 0.011764, 85000)
+        self.assertEqual(http.requests[0][2]["pair"], ["XBTCAD"])  # BTC -> XBT
+        order = urllib.parse.parse_qs(http.requests[-1][3].decode())
+        self.assertEqual((order["pair"], order["type"], order["volume"]), (["XBTCAD"], ["buy"], ["0.01176400"]))
+        broker, http = self.kraken(state)  # restart
+        self.assertEqual(broker.close("BTCCAD", 86000)["qty"], 0.011764)  # not the account's 0.5 BTC
+        self.assertEqual(broker.position_qty("BTCCAD"), 0)
+        self.assertAlmostEqual(broker.equity(), 500.0)
+
+    def test_errors_become_broker_errors(self):
+        broker, http = self.kraken(os.path.join(tempfile.mkdtemp(), "p.json"))
+        http.routes[("POST", "/0/private/AddOrder")] = {"error": ["EOrder:Insufficient funds"]}
+        with self.assertRaisesRegex(BrokerError, "Insufficient funds"):
+            broker.buy("BTCCAD", 0.01, 85000)
+
+    def test_nonces_increase(self):
+        broker, http = self.kraken(os.path.join(tempfile.mkdtemp(), "p.json"))
+        broker._balances()
+        broker._balances()
+        nonces = [urllib.parse.parse_qs(r[3].decode())["nonce"][0] for r in http.requests]
+        self.assertLess(int(nonces[0]), int(nonces[1]))
+
+
 class ConfigTests(unittest.TestCase):
     def test_requires_secret(self):
         with self.assertRaises(ValueError):
@@ -166,6 +210,12 @@ class ConfigTests(unittest.TestCase):
         env = {"WEBHOOK_SECRET": SECRET, "BROKER": "alpaca", "ALPACA_KEY": "k", "ALPACA_SECRET": "s"}
         self.assertIn("paper-api", Config.from_env(env).alpaca_base_url)
         self.assertNotIn("paper", Config.from_env(dict(env, LIVE_TRADING="true")).alpaca_base_url)
+
+    def test_kraken_requires_explicit_live_trading(self):
+        env = {"WEBHOOK_SECRET": SECRET, "BROKER": "kraken", "KRAKEN_KEY": "k", "KRAKEN_SECRET": "s"}
+        with self.assertRaisesRegex(ValueError, "no practice mode"):
+            Config.from_env(env)
+        self.assertEqual(Config.from_env(dict(env, LIVE_TRADING="true")).broker, "kraken")
 
     def test_binance_testnet_unless_live(self):
         env = {"WEBHOOK_SECRET": SECRET, "BROKER": "binance", "BINANCE_KEY": "k", "BINANCE_SECRET": "s"}
