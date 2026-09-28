@@ -1,0 +1,56 @@
+//@version=5
+// EMA trend + RSI pullback strategy that sends webhook alerts to the trading bot.
+//
+// How it "reads the chart":
+//   - Trend filter:  fast EMA above slow EMA  => uptrend
+//   - Entry trigger: RSI crosses back up above the oversold level while in an uptrend
+//   - Exit:          trend flips (fast EMA crosses below slow EMA), RSI overbought,
+//                    or the stop-loss / take-profit is hit
+//
+// Setup:
+//   1. Paste into the TradingView Pine Editor, "Add to chart".
+//   2. Check the Strategy Tester tab — if it doesn't make money on history, don't run it.
+//   3. Create an alert on this strategy: Condition = this script, "alert() function calls only".
+//      Webhook URL = https://<your-server>/webhook
+//   4. Set the "Webhook secret" input below to the same value as WEBHOOK_SECRET on the server.
+strategy("EMA/RSI Webhook Bot", overlay=true, initial_capital=10000,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.05)
+
+fastLen    = input.int(20, "Fast EMA")
+slowLen    = input.int(50, "Slow EMA")
+rsiLen     = input.int(14, "RSI length")
+oversold   = input.int(35, "RSI oversold")
+overbought = input.int(70, "RSI overbought")
+stopPct    = input.float(3.0, "Stop loss %") / 100
+takePct    = input.float(6.0, "Take profit %") / 100
+secret     = input.string("change-me", "Webhook secret")
+
+fast = ta.ema(close, fastLen)
+slow = ta.ema(close, slowLen)
+rsi  = ta.rsi(close, rsiLen)
+
+upTrend   = fast > slow
+longEntry = upTrend and ta.crossover(rsi, oversold) and strategy.position_size == 0
+longExit  = strategy.position_size > 0 and (ta.crossunder(fast, slow) or ta.crossover(rsi, overbought))
+
+plot(fast, "Fast EMA", color=color.teal)
+plot(slow, "Slow EMA", color=color.orange)
+
+msg(action) =>
+    '{"secret":"' + secret + '","symbol":"' + syminfo.ticker + '","action":"' + action + '","price":' + str.tostring(close) + '}'
+
+if longEntry
+    strategy.entry("Long", strategy.long)
+    alert(msg("buy"), alert.freq_once_per_bar_close)
+
+if strategy.position_size > 0
+    entryPrice = strategy.position_avg_price
+    strategy.exit("SL/TP", "Long", stop=entryPrice * (1 - stopPct), limit=entryPrice * (1 + takePct))
+    // Mirror the stop/take-profit to the bot, since TradingView's simulated exits don't send alerts on their own.
+    if low <= entryPrice * (1 - stopPct) or high >= entryPrice * (1 + takePct)
+        alert(msg("sell"), alert.freq_once_per_bar)
+
+if longExit
+    strategy.close("Long")
+    alert(msg("sell"), alert.freq_once_per_bar_close)
