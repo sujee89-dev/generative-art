@@ -1827,6 +1827,38 @@ document.addEventListener("keydown", Speech.unlock, { capture: true });
 prepareData();
 drawBackdrop();
 render();
+// Android app: offer new versions. MainActivity checks the download page and
+// calls AharaUpdate.available(); the download and install happen inside the app.
+window.AharaUpdate = (() => {
+  const bar = $("#updateBar");
+  let apk = "";
+  const show = html => { bar.innerHTML = html; bar.hidden = false; };
+  const buttons = (main, mainLabel) => `<div class="btns">${main ? `<button type="button" class="btn go" data-go>${mainLabel}</button>` : ""}<button type="button" class="btn alt" data-later>Later</button></div>`;
+  const wire = () => {
+    const go = $("[data-go]", bar), later = $("[data-later]", bar), page = $("[data-page]", bar);
+    if (go) go.onclick = () => window.AharaApp.downloadUpdate(apk);
+    if (later) later.onclick = () => { bar.hidden = true; };
+    if (page) page.onclick = () => window.AharaApp.openDownloadPage();
+  };
+  return {
+    available(name, url) {
+      apk = url;
+      show(`<p>🎉 <b>A new version of the app is ready</b> (version ${esc(name)}). Stars and progress are kept.</p>${buttons(true, "Update now")}`);
+      wire();
+    },
+    event(type, pct) {
+      if (type === "progress") show(`<p>⬇ Downloading the update… ${pct}%</p><div class="meter"><i style="width:${pct}%"></i></div>`);
+      else if (type === "installing") { show(`<p>✅ Downloaded. Tap <b>Install</b> (or <b>Update</b>) on the next screen.</p>${buttons(false)}`); wire(); }
+      else if (type === "permission") { show(`<p>🔒 Android needs your OK first: turn on <b>Allow from this source</b> for Ahara, come back, then tap <b>Update now</b> again.</p>${buttons(true, "Update now")}`); wire(); }
+      else if (type === "failed") { show(`<p>😕 The update could not download here. You can get it from the download page instead.</p><div class="btns"><button type="button" class="btn go" data-page>Open download page</button><button type="button" class="btn alt" data-later>Later</button></div>`); wire(); }
+    }
+  };
+})();
+if (window.AharaApp) {
+  try { $("#footer").insertAdjacentHTML("afterend", `<p class="meta">App version 1.${window.AharaApp.version()}</p>`); } catch {}
+  setTimeout(() => { try { window.AharaApp.checkForUpdate(); } catch {} }, 1500);
+}
+
 // Installed-app support: save the app on the device so it also works offline.
 if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
   try { navigator.serviceWorker.register("sw.js").catch(() => {}); } catch {}

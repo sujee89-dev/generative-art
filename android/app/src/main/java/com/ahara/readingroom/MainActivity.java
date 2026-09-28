@@ -2,11 +2,16 @@ package com.ahara.readingroom;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
@@ -20,6 +25,11 @@ import android.webkit.WebViewClient;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Locale;
 import java.util.Set;
 
@@ -33,6 +43,10 @@ import java.util.Set;
  */
 public class MainActivity extends Activity {
     private static final String START_URL = "file:///android_asset/www/index.html";
+    /** Published by the build workflow next to the APK on the GitHub Pages site. */
+    private static final String VERSION_URL = "https://sujee89-dev.github.io/generative-art/downloads/version.json";
+    private static final String DOWNLOAD_PAGE = "https://sujee89-dev.github.io/generative-art/downloads/";
+    private static final String APK_MIME = "application/vnd.android.package-archive";
 
     private WebView web;
     private TextToSpeech tts;
@@ -67,6 +81,7 @@ public class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new Bridge(), "AndroidTTS");
+        web.addJavascriptInterface(new AppBridge(), "AharaApp");
 
         tts = new TextToSpeech(this, status -> {
             ttsReady = status == TextToSpeech.SUCCESS;
@@ -132,6 +147,129 @@ public class MainActivity extends Activity {
         tts.setSpeechRate(rate);
         tts.setPitch(pitch);
         if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, new Bundle(), id) != TextToSpeech.SUCCESS) send(id, "error", 0);
+    }
+
+    /* ------------------------------------------------------------ updates */
+
+    private int myVersion() {
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return Build.VERSION.SDK_INT >= 28 ? (int) info.getLongVersionCode() : info.versionCode;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private void updateEvent(String type, int percent) {
+        final String code = "window.AharaUpdate && window.AharaUpdate.event('" + type + "', " + percent + ")";
+        runOnUiThread(() -> js(code));
+    }
+
+    /** Asks the download page whether a newer build exists; tells the page if so. */
+    private void checkForUpdate() {
+        new Thread(() -> {
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) new URL(VERSION_URL + "?t=" + System.currentTimeMillis()).openConnection();
+                c.setConnectTimeout(8000);
+                c.setReadTimeout(8000);
+                c.setUseCaches(false);
+                if (c.getResponseCode() != 200) return;
+                StringBuilder body = new StringBuilder();
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
+                    String line;
+                    while ((line = r.readLine()) != null) body.append(line);
+                }
+                JSONObject o = new JSONObject(body.toString());
+                if (o.optInt("versionCode", 0) > myVersion()) {
+                    final String code = "window.AharaUpdate && window.AharaUpdate.available("
+                            + JSONObject.quote(o.optString("versionName")) + ", " + JSONObject.quote(o.optString("apk")) + ")";
+                    runOnUiThread(() -> js(code));
+                }
+            } catch (Exception ignored) {
+                // Offline or the site is unreachable: try again next time the app opens.
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }).start();
+    }
+
+    /** Downloads the new APK inside the app, then opens Android's installer. */
+    private void startUpdate(String apkUrl) {
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            updateEvent("permission", 0);
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) { }
+            return;
+        }
+        try {
+            File old = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "ahara-update.apk");
+            if (old.exists()) old.delete();
+            final DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(apkUrl))
+                    .setTitle("Ahara app update")
+                    .setMimeType(APK_MIME)
+                    .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "ahara-update.apk")
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);
+            final long id = dm.enqueue(request);
+            updateEvent("progress", 0);
+            new Thread(() -> watchDownload(dm, id)).start();
+        } catch (Exception e) {
+            updateEvent("failed", 0);
+        }
+    }
+
+    private void watchDownload(DownloadManager dm, long id) {
+        while (true) {
+            try { Thread.sleep(500); } catch (InterruptedException e) { return; }
+            Cursor c = dm.query(new DownloadManager.Query().setFilterById(id));
+            if (c == null) { updateEvent("failed", 0); return; }
+            try {
+                if (!c.moveToFirst()) { updateEvent("failed", 0); return; }
+                int status = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                long done = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                long total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                    updateEvent("progress", 100);
+                    runOnUiThread(() -> install(dm, id));
+                    return;
+                }
+                if (status == DownloadManager.STATUS_FAILED) { updateEvent("failed", 0); return; }
+                if (total > 0) updateEvent("progress", (int) (done * 100 / total));
+            } finally {
+                c.close();
+            }
+        }
+    }
+
+    private void install(DownloadManager dm, long id) {
+        try {
+            Uri uri = dm.getUriForDownloadedFile(id);
+            if (uri == null) { updateEvent("failed", 0); return; }
+            Intent intent = new Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, APK_MIME)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            updateEvent("installing", 100);
+        } catch (Exception e) {
+            updateEvent("failed", 0);
+        }
+    }
+
+    /** Methods the page can call as window.AharaApp.*. */
+    private class AppBridge {
+        @JavascriptInterface
+        public int version() { return myVersion(); }
+
+        @JavascriptInterface
+        public void checkForUpdate() { MainActivity.this.checkForUpdate(); }
+
+        @JavascriptInterface
+        public void downloadUpdate(String apkUrl) { runOnUiThread(() -> startUpdate(apkUrl)); }
+
+        @JavascriptInterface
+        public void openDownloadPage() { runOnUiThread(() -> openOutside(DOWNLOAD_PAGE)); }
     }
 
     /** Methods the page can call as window.AndroidTTS.*. */

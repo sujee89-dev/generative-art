@@ -4,6 +4,9 @@
     <!-- Only used for the web fonts and the "more books" links. The app works offline. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Lets the app install its own updates (Android asks the parent to allow it once). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Lets the app find the tablet's text-to-speech engine on newer Android versions. -->
     <queries>
         <intent>

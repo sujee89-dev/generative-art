@@ -1,6 +1,6 @@
 // Offline support: keeps a copy of the app on the device.
 // Bump VERSION whenever any file changes so devices pick up the new copy.
-const VERSION = "ahara-v2";
+const VERSION = "ahara-v3";
 const FILES = [
   "./", "index.html", "android-tts.js", "app.js", "world.js", "chess.js", "manifest.webmanifest",
   "data/words.js", "data/books-en.js", "data/books-fr.js", "data/books-ta.js", "data/world.js",
