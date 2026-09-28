@@ -8,7 +8,7 @@ For each symbol in COVERED_CALL_SYMBOLS, checked hourly during US market hours:
   3. Sell one call per 100 shares that isn't already covered: the expiry closest to CC_TARGET_DTE
      days (within CC_MIN_DTE..CC_MAX_DTE), at the lowest strike at least CC_OTM_PCT above the last
      close, as a limit order at the bid/ask midpoint. Unfilled orders are cancelled and retried
-     at the next check.
+     at the next check, asking a little less each time (halfway to the bid, then the bid).
 When the trend bot sells the shares, IBKRBroker calls `cover` first, which buys the calls back, so
 a call is never left uncovered.
 """
@@ -39,11 +39,16 @@ def pick_strike(strikes, price, otm_pct=0.10):
     return next((k for k in sorted(strikes) if k >= price * (1 + otm_pct)), None)
 
 
-def limit_price(bid, ask):
-    """Midpoint, rounded down to a valid option tick (0.05 from $3, else 0.01)."""
+def limit_price(bid, ask, misses=0):
+    """Asking price for selling a call, rounded down to a valid tick (0.05 from $3, else 0.01).
+
+    First try the midpoint; after each unfilled attempt step down: halfway to the bid, then the
+    bid. Never below the bid. (Free quotes are ~15 min delayed, so the midpoint can be stale.)
+    """
     mid = (bid + ask) / 2 if ask else bid
-    tick = 0.05 if mid >= 3 else 0.01
-    return round(int(mid / tick) * tick, 2)
+    target = mid - min(misses, 2) / 2 * (mid - bid)
+    tick = 0.05 if target >= 3 else 0.01
+    return max(round(int(round(target / tick, 6)) * tick, 2), round(bid, 2))
 
 
 class CoveredCallManager:
@@ -61,6 +66,7 @@ class CoveredCallManager:
         self._market_open = market_open
         self._today = today or (lambda: dt.datetime.now(NEW_YORK).date())
         self._stop = threading.Event()
+        self._misses = {}  # symbol -> unfilled attempts in a row (lowers the asking price)
         self.calls = {}  # symbol -> [{"expiry", "strike", "qty", "premium"}] sold by the bot
         if os.path.exists(state_path):
             with open(state_path) as f:
@@ -155,8 +161,9 @@ class CoveredCallManager:
         bid, ask = gw.call_quote(symbol, expiry, strike)
         if not bid:
             return self._status(symbol, note=f"no bid for {expiry} {strike} call yet")
-        limit = limit_price(bid, ask)
+        limit = limit_price(bid, ask, self._misses.get(symbol, 0))
         order_id, filled, avg = gw.call_order(symbol, expiry, strike, "SELL", to_sell, limit=limit)
+        self._misses[symbol] = 0 if filled > 0 else self._misses.get(symbol, 0) + 1
         if filled > 0:
             self.calls.setdefault(symbol, []).append(
                 {"expiry": expiry, "strike": strike, "qty": int(filled), "premium": avg})
