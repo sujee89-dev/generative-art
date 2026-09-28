@@ -81,6 +81,40 @@ Unlike the backtest, which compounds 95% of the account, the bot spends a fixed
 lives in memory, so after a restart the bot is flat and simply buys again at the next check if
 the trend is still up.
 
+## Stock bot (Interactive Brokers, paper first)
+
+Set `STOCK_SYMBOLS` (e.g. `SPY,QQQ,NVDA,META,TSLA,GOOGL,MSFT`) and the bot runs the same
+**Trend (200 SMA)** rule on each US stock/ETF, trading through Interactive Brokers:
+
+- **Prices:** free daily closes from Stooq, with Yahoo as a fallback. Today's bar is ignored until
+  16:30 New York time.
+- **Orders:** market orders for whole shares, placed only during US market hours (the first hourly
+  check after 9:30). Unfilled orders are cancelled after about a minute, so a retry never
+  stacks duplicates.
+- **Positions:** tracked in `STOCK_STATE_PATH`. The bot only ever sells the shares it bought.
+- **Separate from crypto:** its own engine, limits (`STOCK_POSITION_USD`,
+  `STOCK_MAX_DAILY_LOSS_USD`) and journal (`STOCK_JOURNAL_PATH`). `/status` shows it under `stocks`.
+- **Paper safety:** it refuses to trade a live account (IDs not starting with `D`) unless
+  `IBKR_LIVE=true`.
+
+It connects to **IB Gateway** with the `ib_async` library. On Render, run the gateway as a private
+service from the public image `ghcr.io/gnzsnz/ib-gateway:stable` (Standard plan, since it needs
+about 1 GB of RAM) with these settings:
+
+- `TWS_USERID` / `TWS_PASSWORD`: your IBKR **paper** username and password
+- `TRADING_MODE=paper`
+- `READ_ONLY_API=no`
+- `TIME_ZONE=America/New_York`
+
+Then give the bot `IBKR_HOST` (the gateway's internal address) and `IBKR_PORT=4004`, the paper port.
+
+Caveats:
+- `STOCK_MAX_DAILY_LOSS_USD` compares the whole IBKR account's value, so use an account that
+  only the bot trades.
+- A live IBKR login needs a 2FA approval on your phone about once a week.
+- These services aren't in `render.yaml` on purpose: changing that file re-applies its env
+  values and could reset a live crypto setup.
+
 ## Risk controls (enforced by the bot, whatever the alert says)
 
 | Setting | Default | What it does |
@@ -96,7 +130,8 @@ a symbol it already holds, alerts need the shared secret, and every trade is app
 
 ## Setup
 
-Requires Python 3.9 or newer. It uses only the standard library, so there's nothing to install.
+Requires Python 3.9 or newer. The crypto bot uses only the standard library. The stock bot also
+needs Python 3.10+ and `pip install -r requirements.txt` (`ib_async`, `tzdata`); the Docker image installs these.
 
 ### 1. Run the bot with the built-in simulator
 
@@ -204,6 +239,8 @@ cd trading-bot && python -m unittest discover -s tests -t .
 
 ## Files
 
+- `bot/ibkr.py`: Interactive Brokers stocks through IB Gateway (ib_async).
+- `bot/stockdata.py`: free daily US stock prices (Stooq, Yahoo fallback) and market hours.
 - `bot/autotrader.py`: reads Kraken's daily chart and trades Trend (200 SMA) without TradingView.
 - `bot/server.py`: HTTP server with `POST /webhook`, `GET /status` and `GET /health`.
 - `bot/engine.py`: alert validation, risk limits and the trade journal.
