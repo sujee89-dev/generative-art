@@ -11,6 +11,13 @@
 // All three are long-only and sit in cash during downtrends. Each trade uses
 // "% of account per trade" of the account.
 //
+// Results on KRAKEN:BTCCAD 1D, 95% per trade, 0.4% fees:
+//   2016–2021 (used to pick the style): Trend +6,606%, Golden cross +5,908% (5 trades),
+//                                       Breakout +2,164%.
+//   2022–Sep 2026 (never tuned on):     Trend +218.8%, max drawdown 21.2%, 4/10 winners,
+//                                       vs about +100% buy and hold (with a ~65% crash).
+// Trend (200 SMA) is therefore the default.
+//
 // Honest testing: pick the style using an early period ("Only trade from" 2016 and
 // "Stop trading at" 2022-01-01). Then check that style once on 2022 to today, which it was never
 // tuned on. Only trust it if it still holds up there.
@@ -19,7 +26,7 @@
 strategy("Trend Breakout Webhook Bot", overlay=true, initial_capital=10000,
      commission_type=strategy.commission.percent, commission_value=0.4)
 
-mode     = input.string("Breakout", "Strategy", options=["Breakout", "Trend (200 SMA)", "Golden cross"])
+mode     = input.string("Trend (200 SMA)", "Strategy", options=["Breakout", "Trend (200 SMA)", "Golden cross"])
 sizePct  = input.float(95, "% of account per trade", minval=1, maxval=100)
 entryLen = input.int(20, "Breakout: highest high of last N bars")
 exitLen  = input.int(10, "Breakout: exit at lowest low of last N bars")

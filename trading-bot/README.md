@@ -21,9 +21,15 @@ TradingView has no API for pulling chart data or signals. The supported way to a
   you choose between in its settings (20-bar breakout, 200-SMA trend and 50/200 golden cross). All
   of them sit in cash during downtrends. It has start and stop date inputs, so you can pick a style
   on one period and check it on a later one it was never tuned on.
-  - Breakout at 10% per trade, 2022–Sep 2026: +8.2% on the account (about 2%/year) with a 2.8%
-    max drawdown, against +346% for buy and hold. It avoided the 2022 crash but badly lagged the
-    rallies, which is why position size now defaults to 95%.
+  - **Default: Trend (200 SMA).** It was chosen on 2016–2021 (Trend +6,606%, Golden cross
+    +5,908% from only 5 trades, Breakout +2,164%). Then it was checked once on **2022–Sep 2026**,
+    which it was never tuned on: **+218.8%, max drawdown 21.2%**, 4 of 10 trades profitable.
+    Buy and hold made about +100% over that period, with a ~65% crash in 2022, which the strategy
+    sat out in cash.
+  - It profits from a few long trends and takes several small losses in between, so expect long
+    quiet spells. Past results don't guarantee future ones.
+  - An earlier Breakout run at 10% per trade made only about 2%/year (2022–2026), which is why
+    position size now defaults to 95%.
 - **`ema_rsi_strategy.pine`**: buys RSI pullbacks in an EMA uptrend with a 3% stop and 6% target.
   On `KRAKEN:BTCCAD` 1h (Dec 2024–Sep 2026) it **lost 2.5%**: 2 winners out of 26 trades, with
   fees making up most of the loss. It's kept as an example of what the Strategy Tester is for.
