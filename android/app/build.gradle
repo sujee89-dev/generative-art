@@ -14,6 +14,30 @@ android {
         versionName "1." + (System.getenv("VERSION_CODE") ?: "0")
     }
 
+    buildFeatures {
+        buildConfig true
+    }
+
+    // One app per child. Both share the web app in assets/www/shared and differ only in
+    // which page they open, their name, icon and where they look for updates.
+    flavorDimensions "child"
+    productFlavors {
+        ahara {
+            dimension "child"
+            applicationId "com.ahara.readingroom"
+            buildConfigField "String", "START_URL", '"file:///android_asset/www/ahara/index.html"'
+            buildConfigField "String", "VERSION_URL", '"https://sujee89-dev.github.io/generative-art/downloads/version.json"'
+            buildConfigField "String", "DOWNLOAD_PAGE", '"https://sujee89-dev.github.io/generative-art/downloads/"'
+        }
+        aria {
+            dimension "child"
+            applicationId "com.aria.readingroom"
+            buildConfigField "String", "START_URL", '"file:///android_asset/www/aria/index.html"'
+            buildConfigField "String", "VERSION_URL", '"https://sujee89-dev.github.io/generative-art/downloads/aria/version.json"'
+            buildConfigField "String", "DOWNLOAD_PAGE", '"https://sujee89-dev.github.io/generative-art/downloads/aria/"'
+        }
+    }
+
     signingConfigs {
         release {
             // A dedicated key for this family app, kept in the repo so every build can

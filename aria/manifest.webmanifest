@@ -1,0 +1,29 @@
+{
+  "name": "Aria's Reading Room",
+  "short_name": "Aria",
+  "description": "Reading in English, French and Nepali, the Nepali alphabet and barahkhari, math, colors and numbers, a world map and chess.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f1e9fb",
+  "theme_color": "#8a5cc7",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

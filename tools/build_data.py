@@ -15,7 +15,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SRC = HERE / "src"
-OUT = HERE.parent / "data" / "words.js"
+OUT = HERE.parent / "shared" / "data" / "words.js"
 
 
 # ---------------------------------------------------------------- English
@@ -233,7 +233,29 @@ def ta_syllables(word):
     return out or [word]
 
 
-SPLIT = {"en": en_syllables, "fr": fr_syllables, "ta": ta_syllables}
+NE_VIRAMA = "\u094d"
+
+
+def ne_syllables(word):
+    """Split Devanagari into aksharas (the units children sound out):
+    consonant (+ virama + consonant)* + vowel sign + nasal/visarga marks,
+    or an independent vowel. A word-final dead consonant joins the beat
+    before it, e.g. बच्चा -> ब + च्चा, माफ् -> माफ्."""
+    out = []
+    for ch in word:
+        cat = unicodedata.category(ch)
+        joins = out and (cat.startswith("M") or out[-1].endswith(NE_VIRAMA))
+        if joins:
+            out[-1] += ch
+        else:
+            out.append(ch)
+    if len(out) > 1 and out[-1].endswith(NE_VIRAMA):
+        last = out.pop()
+        out[-1] += last
+    return out or [word]
+
+
+SPLIT = {"en": en_syllables, "fr": fr_syllables, "ta": ta_syllables, "ne": ne_syllables}
 
 
 def syllabify(lang, word):
@@ -246,7 +268,9 @@ def syllabify(lang, word):
 
 def read_words(lang):
     seen, words = set(), []
-    for line in (SRC / f"words-{lang}.txt").read_text(encoding="utf-8").splitlines():
+    path = SRC / f"words-{lang}.txt"
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    for line in lines:
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -282,6 +306,15 @@ def read_pictures():
         if ta:
             row["ta"] = ta
         rows.append(row)
+    ne_path = SRC / "pictures-ne.tsv"
+    if ne_path.exists():
+        by_emoji = {r["e"]: r for r in rows}
+        for line in ne_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip() or line.startswith("#"):
+                continue
+            emoji, ne = (line.split("\t") + [""])[:2]
+            if emoji.strip() in by_emoji and ne.strip():
+                by_emoji[emoji.strip()]["ne"] = ne.strip()
     return rows
 
 
@@ -303,15 +336,21 @@ def read_gloss(lang):
 def main():
     pictures = read_pictures()
     data = {"pictures": pictures, "words": {}}
-    for lang in ("en", "fr", "ta"):
+    for lang in ("en", "fr", "ta", "ne"):
         words, seen = read_words(lang)
+        gloss = read_gloss(lang)
+        if lang == "ne":
+            # the Nepali gloss list doubles as the reading list
+            for w in gloss:
+                if " " not in w and w not in seen:
+                    seen.add(w)
+                    words.append(w)
         # every picture word is also a reading word
         for p in pictures:
             w = p.get(lang)
             if w and " " not in w and w.lower() not in seen:
                 seen.add(w.lower())
                 words.append(w)
-        gloss = read_gloss(lang)
         for p in pictures:
             if p.get(lang) and p.get("en"):
                 gloss.setdefault(p[lang], p["en"])

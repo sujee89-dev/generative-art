@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Aria</string>
+    <color name="background">#f1e9fb</color>
+    <color name="theme">#8a5cc7</color>
+</resources>

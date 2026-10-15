@@ -11,7 +11,17 @@ const sqName = i => FILES[i % 8] + (Math.floor(i / 8) + 1);
 const sqIndex = n => FILES.indexOf(n[0]) + (+n[1] - 1) * 8;
 const VALUE = { P: 1, N: 3, B: 3, R: 5, Q: 9, K: 0 };
 const NAME = { K: "king", Q: "queen", R: "rook", B: "bishop", N: "knight", P: "pawn" };
-const GLYPH = { K: "♚", Q: "♛", R: "♜", B: "♝", N: "♞", P: "♟" };
+// Pieces are drawn as pictures, not text symbols: some Android tablets swap the
+// chess symbols for emoji, which made white pieces show up black.
+const PIECE_SVG = {
+  P: `<circle cx="22.5" cy="13" r="6"/><path d="M17.5 20h10l2.5 8c3 2 4 5 4.5 8h-24c.5-3 1.5-6 4.5-8z"/><rect x="10" y="36" width="25" height="4.5" rx="2"/>`,
+  R: `<path d="M11.5 8h4.5v4h4.5V8h4v4h4.5V8h4.5v8.5l-3.5 3v12l3.5 3.5v1.5h-22v-1.5l3.5-3.5v-12l-3.5-3z"/><rect x="9" y="36.5" width="27" height="4.5" rx="2"/><path class="line" d="M15 19.5h15M15 31.5h15"/>`,
+  B: `<circle cx="22.5" cy="7.5" r="2.8"/><path d="M22.5 10.5c-6.5 4-9 10.5-6.5 17h13c2.5-6.5 0-13-6.5-17z"/><path d="M14.5 29h16l2 6h-20z"/><rect x="10" y="36" width="25" height="4.5" rx="2"/><path class="line" d="M22.5 15v8M18.8 19h7.4"/>`,
+  N: `<path d="M13 36.5c0-8 3.5-11 8-14.5-4.5.5-7.5 2.5-8.5 5l-4-2.5c.5-6 5.5-12 10-13.5l1-4.5 3.5 4c8 1 12.5 9 12.5 17 0 3-.5 6-1 9z"/><rect x="11" y="36" width="25" height="4.5" rx="2"/><circle class="eye" cx="21" cy="14.5" r="1.5"/>`,
+  Q: `<circle cx="8.5" cy="12" r="2.6"/><circle cx="15.5" cy="8.5" r="2.6"/><circle cx="22.5" cy="7" r="2.6"/><circle cx="29.5" cy="8.5" r="2.6"/><circle cx="36.5" cy="12" r="2.6"/><path d="M8.5 14.5l4.5 15.5h19l4.5-15.5-7 8.5-2.5-12-4.5 12-4.5-12-2.5 12z"/><path d="M12.5 30h20l1.5 5.5h-23z"/><rect x="10" y="36" width="25" height="4.5" rx="2"/>`,
+  K: `<path class="line thick" d="M22.5 3.5v9M18 7.5h9"/><path d="M22.5 13.5c-3 0-5 3-4 7-6.5-4-13 .5-10.5 6.5 1 2.5 3.5 5 5 7.5h19c1.5-2.5 4-5 5-7.5 2.5-6-4-10.5-10.5-6.5 1-4-1-7-4-7z"/><rect x="10" y="35.5" width="25" height="5" rx="2"/>`
+};
+const pieceHtml = (t, c, cls = "") => `<svg class="pc ${c === "w" ? "white" : "black"} ${cls}" viewBox="0 0 45 45" aria-hidden="true">${PIECE_SVG[t]}</svg>`;
 const other = c => c === "w" ? "b" : "w";
 const onBoard = (f, r) => f >= 0 && f < 8 && r >= 0 && r < 8;
 
@@ -152,7 +162,7 @@ function boardEl(o) {
         if (i === checkSq) cell.classList.add("check");
         if (o.marks && o.marks.has(i)) cell.classList.add("mark");
         const p = s.b[i];
-        if (p) cell.innerHTML = `<span class="pc ${p[0] === "w" ? "white" : "black"}">${GLYPH[p[1]]}︎</span>`;
+        if (p) cell.innerHTML = pieceHtml(p[1], p[0]);
         else if (o.stars && o.stars.has(i)) cell.innerHTML = `<span class="star">⭐</span>`;
         const tgt = targets.find(m => m.to === i);
         if (tgt) cell.insertAdjacentHTML("beforeend", `<i class="${p ? "cap" : "dot"}"></i>`);
@@ -190,7 +200,7 @@ function boardEl(o) {
 function choosePromotion(board, color, done) {
   const box = document.createElement("div");
   box.className = "promo";
-  box.innerHTML = `<p>Your pawn becomes…</p>` + ["Q", "R", "B", "N"].map(t => `<button type="button" data-t="${t}"><span class="pc ${color === "w" ? "white" : "black"}">${GLYPH[t]}︎</span><small>${NAME[t]}</small></button>`).join("");
+  box.innerHTML = `<p>Your pawn becomes…</p>` + ["Q", "R", "B", "N"].map(t => `<button type="button" data-t="${t}">${pieceHtml(t, color)}<small>${NAME[t]}</small></button>`).join("");
   box.querySelectorAll("button").forEach(b => b.onclick = () => { box.remove(); done(b.dataset.t); });
   board.appendChild(box);
 }
@@ -285,6 +295,12 @@ function render() {
   const body = document.createElement("div");
   panel.appendChild(body);
   [learn, puzzles, b => play(b, false), b => play(b, true)][st.mode](body);
+  // On a sideways tablet the board would start below the screen edge: bring it into view.
+  const board = body.querySelector(".chess-board");
+  if (board && board.getBoundingClientRect().bottom > innerHeight) {
+    const top = body.querySelector(".game-top, .lesson") || board;
+    top.scrollIntoView({ block: "start" });
+  }
 }
 
 function learn(body) {
@@ -294,7 +310,7 @@ function learn(body) {
   LESSONS.forEach((l, i) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.innerHTML = `${l.icon.length === 1 ? `<span class="pc white mini">${l.icon}︎</span>` : l.icon} ${esc(l.title)}${done[l.id] ? " ✓" : ""}`;
+    b.innerHTML = `${l.id.length === 1 ? pieceHtml(l.id, "w", "mini") : l.icon} ${esc(l.title)}${done[l.id] ? " ✓" : ""}`;
     b.setAttribute("aria-pressed", i === st.lesson);
     b.onclick = () => { st.lesson = i; A().stop(); render(); };
     chips.appendChild(b);
@@ -303,7 +319,7 @@ function learn(body) {
   const l = LESSONS[st.lesson];
   const card = document.createElement("div");
   card.className = "lesson";
-  card.innerHTML = `<h3>${l.icon.length === 1 ? `<span class="pc white mini">${l.icon}︎</span>` : l.icon} ${esc(l.title)}</h3>
+  card.innerHTML = `<h3>${l.id.length === 1 ? pieceHtml(l.id, "w", "mini") : l.icon} ${esc(l.title)}</h3>
     ${l.text.map(p => `<p>${esc(p)}</p>`).join("")}
     <div class="btns"><button type="button" class="btn alt" data-read>🔊 Read to me</button></div>
     <div class="lesson-status feedback"></div>`;
@@ -456,7 +472,7 @@ function play(body, vsComputer) {
   const captured = c => {
     const counts = { Q: 1, R: 2, B: 2, N: 2, P: 8 };
     g.s.b.forEach(p => { if (p && p[0] === c && counts[p[1]] !== undefined) counts[p[1]]--; });
-    return Object.entries(counts).flatMap(([t, n]) => Array(Math.max(0, n)).fill(`<span class="pc ${c === "w" ? "white" : "black"}">${GLYPH[t]}︎</span>`)).join("");
+    return Object.entries(counts).flatMap(([t, n]) => Array(Math.max(0, n)).fill(pieceHtml(t, c))).join("");
   };
   const stat = status(g.s);
   const msg = stat === "checkmate" ? `Checkmate! ${who(other(g.s.turn))} wins! 🏆`

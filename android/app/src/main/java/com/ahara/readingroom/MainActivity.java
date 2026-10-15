@@ -42,10 +42,10 @@ import java.util.Set;
  * window.speechSynthesis API that the app already uses.
  */
 public class MainActivity extends Activity {
-    private static final String START_URL = "file:///android_asset/www/index.html";
+    private static final String START_URL = BuildConfig.START_URL;
     /** Published by the build workflow next to the APK on the GitHub Pages site. */
-    private static final String VERSION_URL = "https://sujee89-dev.github.io/generative-art/downloads/version.json";
-    private static final String DOWNLOAD_PAGE = "https://sujee89-dev.github.io/generative-art/downloads/";
+    private static final String VERSION_URL = BuildConfig.VERSION_URL;
+    private static final String DOWNLOAD_PAGE = BuildConfig.DOWNLOAD_PAGE;
     private static final String APK_MIME = "application/vnd.android.package-archive";
 
     private WebView web;
@@ -139,7 +139,11 @@ public class MainActivity extends Activity {
         }
         if (!voiceSet) {
             int result = tts.setLanguage(Locale.forLanguageTag(lang));
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            if (missing(result) && lang.startsWith("ne")) {
+                // Few tablets have a Nepali voice; a Hindi voice reads Devanagari well.
+                result = tts.setLanguage(new Locale("hi", "IN"));
+            }
+            if (missing(result)) {
                 send(id, "error", 0);
                 return;
             }
@@ -147,6 +151,10 @@ public class MainActivity extends Activity {
         tts.setSpeechRate(rate);
         tts.setPitch(pitch);
         if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, new Bundle(), id) != TextToSpeech.SUCCESS) send(id, "error", 0);
+    }
+
+    private static boolean missing(int result) {
+        return result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED;
     }
 
     /* ------------------------------------------------------------ updates */
@@ -208,7 +216,7 @@ public class MainActivity extends Activity {
             if (old.exists()) old.delete();
             final DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(apkUrl))
-                    .setTitle("Ahara app update")
+                    .setTitle(getString(R.string.app_name) + " app update")
                     .setMimeType(APK_MIME)
                     .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "ahara-update.apk")
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);

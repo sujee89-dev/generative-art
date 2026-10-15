@@ -1,0 +1,28 @@
+{
+  "ahara": {
+    "child": "Ahara",
+    "title": "Ahara's Reading Room",
+    "short": "Ahara",
+    "langs": ["en", "fr", "ta"],
+    "names": { "en": "Ahara", "fr": "Ahara", "ta": "அஹாரா" },
+    "storePrefix": "ahara:",
+    "theme": "#2f8fd8",
+    "background": "#dff1f7",
+    "font": "Baloo+Thambi+2:wght@500;800",
+    "downloadPage": "https://sujee89-dev.github.io/generative-art/downloads/",
+    "description": "Reading in English, French and Tamil, all 247 Tamil letters, math, colors and numbers, a world map and chess."
+  },
+  "aria": {
+    "child": "Aria",
+    "title": "Aria's Reading Room",
+    "short": "Aria",
+    "langs": ["en", "fr", "ne"],
+    "names": { "en": "Aria", "fr": "Aria", "ne": "Aria" },
+    "storePrefix": "aria:",
+    "theme": "#8a5cc7",
+    "background": "#f1e9fb",
+    "font": "Baloo+2:wght@500;800",
+    "downloadPage": "https://sujee89-dev.github.io/generative-art/downloads/aria/",
+    "description": "Reading in English, French and Nepali, the Nepali alphabet and barahkhari, math, colors and numbers, a world map and chess."
+  }
+}

@@ -1,13 +1,13 @@
 name: Build Android app
 
-# Builds the Fire tablet / Android app from the ahara/ web app and publishes it
-# as the "ahara-latest" release, so the newest APK is always at:
-# https://github.com/sujee89-dev/generative-art/releases/download/ahara-latest/ahara-reading-room.apk
-# and on the Pages site at https://sujee89-dev.github.io/generative-art/downloads/
+# Builds the two Fire tablet / Android apps (Ahara and Aria) from the shared web app
+# and publishes them on the Pages site and as the "ahara-latest" / "aria-latest" releases:
+#   https://sujee89-dev.github.io/generative-art/downloads/          (Ahara)
+#   https://sujee89-dev.github.io/generative-art/downloads/aria/     (Aria)
 on:
   push:
     branches: [main, claude/bilingual-reading-app-ahara-bnxez5]
-    paths: ["ahara/**", "android/**", ".github/workflows/android.yml"]
+    paths: ["ahara/**", "aria/**", "shared/**", "android/**", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 permissions:
@@ -32,45 +32,58 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Copy the web app into the Android assets
+      - name: Copy the web apps into the Android assets
         run: |
-          mkdir -p android/app/src/main/assets/www
-          rsync -a --delete --exclude tools --exclude README.md --exclude sw.js ahara/ android/app/src/main/assets/www/
+          W=android/app/src/main/assets/www
+          rm -rf "$W" && mkdir -p "$W"
+          for d in shared ahara aria; do
+            rsync -a --exclude README.md --exclude sw.js "$d/" "$W/$d/"
+          done
 
-      - name: Build the APK
+      - name: Build the APKs
         env:
           VERSION_CODE: ${{ github.run_number }}
-        run: gradle -p android assembleRelease --no-daemon
+        run: gradle -p android assembleAharaRelease assembleAriaRelease --no-daemon
 
       - name: Rename
-        run: cp android/app/build/outputs/apk/release/app-release.apk ahara-reading-room.apk
+        run: |
+          cp android/app/build/outputs/apk/ahara/release/app-ahara-release.apk ahara-reading-room.apk
+          cp android/app/build/outputs/apk/aria/release/app-aria-release.apk aria-reading-room.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ahara-reading-room-apk
-          path: ahara-reading-room.apk
+          name: reading-room-apks
+          path: |
+            ahara-reading-room.apk
+            aria-reading-room.apk
 
       - name: Put the APK on the GitHub Pages site (a plain download with no redirects)
         if: github.ref_name == 'claude/bilingual-reading-app-ahara-bnxez5'
         run: |
-          mkdir -p downloads
+          N=${{ github.run_number }}
+          P=https://sujee89-dev.github.io/generative-art/downloads
+          mkdir -p downloads/aria
           cp ahara-reading-room.apk downloads/ahara-reading-room.apk
-          # The app reads this to know a newer version exists (see MainActivity.checkForUpdate).
-          printf '{"versionCode": %s, "versionName": "1.%s", "apk": "https://sujee89-dev.github.io/generative-art/downloads/ahara-reading-room.apk?v=%s"}\n' \
-            "${{ github.run_number }}" "${{ github.run_number }}" "${{ github.run_number }}" > downloads/version.json
+          cp aria-reading-room.apk downloads/aria/aria-reading-room.apk
+          # The apps read these to know a newer version exists (see MainActivity.checkForUpdate).
+          printf '{"versionCode": %s, "versionName": "1.%s", "apk": "%s/ahara-reading-room.apk?v=%s"}\n' "$N" "$N" "$P" "$N" > downloads/version.json
+          printf '{"versionCode": %s, "versionName": "1.%s", "apk": "%s/aria/aria-reading-room.apk?v=%s"}\n' "$N" "$N" "$P" "$N" > downloads/aria/version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898099+github-actions[bot]@users.noreply.github.com"
-          git add downloads/ahara-reading-room.apk downloads/version.json
+          git add downloads/ahara-reading-room.apk downloads/version.json downloads/aria/aria-reading-room.apk downloads/aria/version.json
           git commit -m "Update the Android app download (build ${{ github.run_number }})" || exit 0
           git pull --rebase origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
 
-      - name: Publish as the latest release
+      - name: Publish as the latest releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete ahara-latest --yes --cleanup-tag || true
-          gh release create ahara-latest ahara-reading-room.apk \
-            --target "${{ github.sha }}" \
-            --title "Ahara's Reading Room for Android and Fire tablets (build ${{ github.run_number }})" \
-            --notes "Open this page on the tablet and tap ahara-reading-room.apk to download and install it. Works offline. Build ${{ github.run_number }} from ${{ github.sha }}."
+          for app in ahara aria; do
+            name=$([ "$app" = ahara ] && echo Ahara || echo Aria)
+            gh release delete "$app-latest" --yes --cleanup-tag || true
+            gh release create "$app-latest" "$app-reading-room.apk" \
+              --target "${{ github.sha }}" \
+              --title "$name's Reading Room for Android and Fire tablets (build ${{ github.run_number }})" \
+              --notes "Open this page on the tablet and tap $app-reading-room.apk to download and install it. Works offline. Build ${{ github.run_number }} from ${{ github.sha }}."
+          done

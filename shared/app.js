@@ -1,22 +1,57 @@
 (() => {
 "use strict";
 
-/* ============ Change the name here ============ */
-const CHILD = "Ahara";
-// How her name is written in each language. The Tamil sentences add endings
+/* ============ Each child's app sets this in <app>/config.js ============ */
+// Built from tools/apps.json: the child's name, how it is written in each
+// language, and which three languages the app teaches (English, French and a
+// home language such as Tamil or Nepali). The Tamil sentences add endings
 // straight onto the name (அஹாரா + வின் = அஹாராவின்), which suits names ending in ா.
-const NAMES = { en: CHILD, fr: CHILD, ta: "அஹாரா" };
+const CFG = window.APP_CONFIG || {
+  id: "ahara", child: "Ahara", langs: ["en", "fr", "ta"],
+  names: { en: "Ahara", fr: "Ahara", ta: "அஹாரா" }, storePrefix: "ahara:", downloadPage: ""
+};
+const CHILD = CFG.child;
+const NAMES = CFG.names;
+const LANGS = CFG.langs;
+const HOME = LANGS.find(l => l !== "en" && l !== "fr") || "fr";
+const LANG_LABEL = { en: "English", fr: "Français", ta: "தமிழ்", ne: "नेपाली" };
+// Older tablets' browsers lack String.replaceAll.
+const replaceAll = (s, a, b) => String(s).split(a).join(b);
 
 const COLORS = ["#e84a7f", "#2f8fd8", "#3fa66b", "#f28a2e", "#8a5cc7", "#e0a800"];
-const DATA = window.AHARA_DATA || { pictures: [], words: { en: [], fr: [], ta: [] } };
+const DATA = window.AHARA_DATA || { pictures: [], words: {} };
 const BOOKS = window.AHARA_BOOKS || {};
 
 /* ---------------------------------------------------------------- helpers */
 const store = {
-  get(k, d) { try { const v = localStorage.getItem("ahara:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem("ahara:" + k, JSON.stringify(v)); } catch {} }
+  get(k, d) { try { const v = localStorage.getItem(CFG.storePrefix + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(CFG.storePrefix + k, JSON.stringify(v)); } catch {} }
 };
 const $ = (sel, root = document) => root.querySelector(sel);
+
+// Problem log: anything that goes wrong on the device is written down here, so a
+// parent can open Sound check and pass the lines on. Nothing leaves the device.
+function logProblem(msg) {
+  try {
+    const list = store.get("problems", []);
+    const when = new Date().toISOString().slice(0, 16).replace("T", " ");
+    if (list[0] && list[0].m === String(msg).slice(0, 300)) return;
+    list.unshift({ t: when, m: String(msg).slice(0, 300) });
+    store.set("problems", list.slice(0, 15));
+  } catch {}
+}
+window.addEventListener("error", e => logProblem((e.message || "Error") + (e.filename ? ` (${e.filename.split("/").pop()}:${e.lineno})` : "")));
+window.addEventListener("unhandledrejection", e => logProblem("Promise: " + ((e.reason && e.reason.message) || e.reason)));
+function problemLogHtml() {
+  const list = store.get("problems", []);
+  if (!list.length) return "";
+  const where = `${CFG.id} · ${navigator.userAgent.replace(/\s+/g, " ").slice(0, 120)}`;
+  return `<details class="problems"><summary>⚠️ Problems recorded on this device (${list.length})</summary>
+    <p class="hint">If something stops working, send these lines to whoever looks after the app.</p>
+    <ol>${list.map(x => `<li><code>${esc(x.t)}</code> ${esc(x.m)}</li>`).join("")}</ol>
+    <p class="meta">${esc(where)}</p>
+    <div class="btns"><button type="button" class="btn alt" id="clearLog">Clear the list</button></div></details>`;
+}
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const segmenter = window.Intl && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
@@ -87,12 +122,17 @@ const safePic = (p, fallback = "📖") => graphemes(p || "").every(emojiOK) ? p 
 
 /* ---------------------------------------------------------------- state */
 let lang = store.get("lang", "en");
-if (!["en", "fr", "ta"].includes(lang)) lang = "en";
+if (!LANGS.includes(lang)) lang = "en";
 let tab = Math.min(8, Math.max(0, store.get("tab", 0) | 0));
 let stars = store.get("stars", 0) | 0;
 const nm = () => NAMES[lang] || CHILD;
-const fillName = s => s.replaceAll("{n}", nm());
-const fillEn = s => s.replaceAll("{n}", CHILD);
+// A name written in English letters gets a space before Nepali endings: "Aria को".
+const fillName = s => {
+  const name = nm();
+  const latin = !/[\u0900-\u097F]/.test(name);
+  return replaceAll(lang === "ne" && latin ? String(s).replace(/\{n\}(?=[\u0900-\u097F])/g, name + " ") : s, "{n}", name);
+};
+const fillEn = s => replaceAll(s, "{n}", CHILD);
 
 /* ---------------------------------------------------------------- text */
 const UI = {
@@ -123,7 +163,7 @@ const UI = {
     noVoice: l => `This device has no ${l} voice, so words can't be read aloud.`,
     silent: "No sound? Check the volume, then open Sound check.",
     openCheck: "Sound check",
-    langName: { en: "English", fr: "French", ta: "Tamil" }
+    langName: { en: "English", fr: "French", ta: "Tamil", ne: "Nepali" }
   },
   fr: {
     hello: n => `Bonjour, ${n} !`, sub: "Coin lecture", sound: "Son",
@@ -152,7 +192,7 @@ const UI = {
     noVoice: l => `Cet appareil n'a pas de voix en ${l}. Les mots ne peuvent pas être lus à voix haute.`,
     silent: "Pas de son ? Vérifie le volume, puis ouvre Test du son.",
     openCheck: "Test du son",
-    langName: { en: "anglais", fr: "français", ta: "tamoul" }
+    langName: { en: "anglais", fr: "français", ta: "tamoul", ne: "népalais" }
   },
   ta: {
     hello: n => `வணக்கம், ${n}!`, sub: "படிக்கும் அறை", sound: "ஒலி",
@@ -181,8 +221,37 @@ const UI = {
     noVoice: l => `இந்தச் சாதனத்தில் ${l} குரல் இல்லை. சொற்களை வாசித்துக் காட்ட முடியாது.`,
     silent: "ஒலி கேட்கவில்லையா? ஒலி அளவைப் பார்த்து, 'ஒலிச் சோதனை'யைத் திற.",
     openCheck: "ஒலிச் சோதனை",
-    langName: { en: "ஆங்கில", fr: "பிரெஞ்சு", ta: "தமிழ்" }
+    langName: { en: "ஆங்கில", fr: "பிரெஞ்சு", ta: "தமிழ்", ne: "நேபாளி" }
   }
+};
+UI.ne = {
+  hello: n => `नमस्ते, ${n}!`, sub: "पढ्ने कोठा", sound: "आवाज",
+  tabs: ["अक्षर", "शब्द", "पढ", "खेल", "किताब", "गणित", "रङ र अङ्क"],
+  footer: "कुनै पनि शब्द छोएर सुन।",
+  levels: ["सबै", "सजिलो", "मध्यम", "गाह्रो"],
+  lettersH: "नेपाली वर्णमाला", lettersHint: n => `एउटा अक्षर छोऊ, ${n}!`,
+  isFor: (l, w) => `${l}, ${w}`, inName: () => "यो अक्षर तिम्रो नाममा छ!",
+  wordsH: "अक्षर-अक्षर गरी पढ", wordsHint: "हरेक भाग छोऊ, अनि पूरा शब्द पढ।",
+  hear: "सुन", next: "अर्को", prev: "पछाडि",
+  wordCount: (i, n) => `शब्द ${i} / ${n}। सबै पढेपछि मात्र फेरि आउँछ।`,
+  readH: "एउटा वाक्य पढ", readHint: "शब्द छोएर सुन, वा 'पढेर सुनाऊ' थिच।",
+  readMe: "पढेर सुनाऊ", sentCount: (i, n) => `वाक्य ${i} / ${n}`,
+  playH: "खेलहरू", modes: ["चित्र खोज", "सुनेर खोज", "छुटेको अक्षर"],
+  pictureHint: "शब्द पढ, अनि मिल्ने चित्र छोऊ।",
+  listenHint: "सुन, अनि सुनेको शब्द छोऊ।",
+  missingHint: "कुन अक्षर छुटेको छ?",
+  help: "मद्दत", good: n => [`स्याबास, ${n}!`, `धेरै राम्रो, ${n}!`, "तिमी राम्रोसँग पढ्छ्यौ!", `वाह, ${n}!`],
+  bad: "फेरि प्रयास गर!", again: "फेरि खेल", done: n => `सकियो! तिमी तारा हौ, ${n}!`,
+  booksH: "किताबहरू", booksHint: "एउटा किताब छान। कुनै पनि शब्द छोएर सुन।",
+  machine: "अचम्मको कथा", machineSub: "हरेक पटक नयाँ कथा",
+  shelf: "कथाका किताब", more: "इन्टरनेटमा निःशुल्क किताब",
+  moreHint: "यी नयाँ ट्याबमा खुल्छन्। बच्चाको ट्याब्लेटमा अभिभावकले हरेक वेबसाइटलाई अनुमति दिनुपर्ने हुन सक्छ।",
+  read: "पढ", level: l => `तह ${l}`, page: (i, n) => `पाना ${i} / ${n}`,
+  theEnd: "समाप्त", readAll: "पूरा किताब पढ", backToShelf: "सबै किताब", readAgain: "फेरि पढ",
+  noVoice: l => `यो उपकरणमा ${l} आवाज छैन, त्यसैले शब्द पढेर सुनाउन सकिँदैन।`,
+  silent: "आवाज आएन? भोल्युम जाँच, अनि 'आवाज जाँच' खोल।",
+  openCheck: "आवाज जाँच",
+  langName: { en: "अङ्ग्रेजी", fr: "फ्रेन्च", ta: "तमिल", ne: "नेपाली" }
 };
 const t = () => UI[lang];
 const showEn = () => lang !== "en";
@@ -228,7 +297,9 @@ const LETTERS = {
 /* ---------------------------------------------------------------- speech */
 const Speech = (() => {
   const synth = window.speechSynthesis;
-  const TAGS = { en: "en-US", fr: "fr-FR", ta: "ta-IN" };
+  const TAGS = { en: "en-US", fr: "fr-FR", ta: "ta-IN", ne: "ne-NP" };
+  // Few tablets have a Nepali voice. A Hindi voice reads the same Devanagari letters well.
+  const FALLBACK = { ne: "hi" };
   let voices = [];
   let waited = false;
   let current = null;
@@ -246,7 +317,10 @@ const Speech = (() => {
     setTimeout(() => { waited = true; load(); }, 2500);
   }
   const norm = v => (v.lang || "").replace("_", "-").toLowerCase();
-  const voicesFor = l => voices.filter(v => norm(v).startsWith(l));
+  const voicesFor = l => {
+    const own = voices.filter(v => norm(v).startsWith(l));
+    return own.length || !FALLBACK[l] ? own : voices.filter(v => norm(v).startsWith(FALLBACK[l]));
+  };
   function voiceFor(l) {
     const list = voicesFor(l);
     if (!list.length) return null;
@@ -254,6 +328,7 @@ const Speech = (() => {
     return list.find(v => v.name === chosen)
       || list.find(v => norm(v) === TAGS[l].toLowerCase() && v.localService)
       || list.find(v => norm(v) === TAGS[l].toLowerCase())
+      || list.find(v => norm(v) === "hi-in")
       || list.find(v => v.localService) || list[0];
   }
 
@@ -274,8 +349,8 @@ const Speech = (() => {
     let started = false;
     const make = () => {
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = TAGS[l];
       const v = voiceFor(l);
+      u.lang = v ? v.lang : TAGS[l];
       if (v) u.voice = v;
       u.rate = Math.max(0.4, Math.min(1.5, rate));
       u.pitch = 1.05;
@@ -329,6 +404,7 @@ function problem(kind, l) {
   const key = kind + ":" + l;
   if (warned.has(key)) return;
   warned.add(key);
+  logProblem(`Speech ${kind} (${l})`);
   const msg = kind === "unsupported" || (Speech.ready() && !Speech.has(l)) ? t().noVoice(t().langName[l]) : t().silent;
   showToast(msg);
 }
@@ -343,6 +419,7 @@ function showToast(msg) {
 }
 
 /* ---------------------------------------------------------------- sound check */
+const SAMPLES = { en: "Hello! I can read with you.", fr: "Bonjour ! Je peux lire avec toi.", ta: "வணக்கம்! நான் உன்னுடன் படிப்பேன்.", ne: "नमस्ते! म तिमीसँग पढ्छु।" };
 const CHECK = {
   en: {
     title: "Sound check", intro: "Reading aloud uses the voices built into this device. Test each language here.",
@@ -352,11 +429,11 @@ const CHECK = {
     tipsH: "No sound?", tips: [
       "Turn the volume up. On iPhone and iPad, also flip off silent mode.",
       "Amazon Fire tablet: Settings → Accessibility → Text-to-Speech. Pick a voice for each language if one is offered.",
-      "Android: Settings → Accessibility → Text-to-speech → Preferred engine (Speech Services by Google) → Install voice data. Add French and Tamil.",
-      "iPhone or iPad: Settings → Accessibility → Spoken Content → Voices. Download French and Tamil voices.",
+      "Android: Settings → Accessibility → Text-to-speech → Preferred engine (Speech Services by Google) → Install voice data. Add French and {home}.",
+      "iPhone or iPad: Settings → Accessibility → Spoken Content → Voices. Download French and {home} voices.",
       "After installing a voice, close and reopen this page."
     ], close: "Done",
-    sample: { en: "Hello! I can read with you.", fr: "Bonjour ! Je peux lire avec toi.", ta: "வணக்கம்! நான் உன்னுடன் படிப்பேன்." }
+    sample: SAMPLES
   },
   fr: {
     title: "Test du son", intro: "La lecture à voix haute utilise les voix de cet appareil. Teste chaque langue ici.",
@@ -366,11 +443,11 @@ const CHECK = {
     tipsH: "Pas de son ?", tips: [
       "Monte le volume. Sur iPhone et iPad, désactive aussi le mode silencieux.",
       "Tablette Amazon Fire : Paramètres → Accessibilité → Synthèse vocale. Choisis une voix pour chaque langue si possible.",
-      "Android : Paramètres → Accessibilité → Synthèse vocale → Moteur préféré (Services vocaux Google) → Installer les données vocales. Ajoute le français et le tamoul.",
-      "iPhone ou iPad : Réglages → Accessibilité → Contenu énoncé → Voix. Télécharge les voix française et tamoule.",
+      "Android : Paramètres → Accessibilité → Synthèse vocale → Moteur préféré (Services vocaux Google) → Installer les données vocales. Ajoute le français et le {home}.",
+      "iPhone ou iPad : Réglages → Accessibilité → Contenu énoncé → Voix. Télécharge une voix française et une voix en {home}.",
       "Après avoir installé une voix, ferme puis rouvre cette page."
     ], close: "OK",
-    sample: { en: "Hello! I can read with you.", fr: "Bonjour ! Je peux lire avec toi.", ta: "வணக்கம்! நான் உன்னுடன் படிப்பேன்." }
+    sample: SAMPLES
   },
   ta: {
     title: "ஒலிச் சோதனை", intro: "வாசித்துக் காட்ட இந்தச் சாதனத்தில் உள்ள குரல்கள் பயன்படும். ஒவ்வொரு மொழியையும் இங்கே சோதிக்கவும்.",
@@ -380,18 +457,32 @@ const CHECK = {
     tipsH: "ஒலி கேட்கவில்லையா?", tips: [
       "ஒலி அளவை அதிகரிக்கவும். iPhone, iPad-இல் அமைதி நிலையையும் (silent mode) அணைக்கவும்.",
       "Amazon Fire டேப்லெட்: Settings → Accessibility → Text-to-Speech. ஒவ்வொரு மொழிக்கும் குரல் இருந்தால் தேர்ந்தெடுக்கவும்.",
-      "Android: Settings → Accessibility → Text-to-speech → Preferred engine (Speech Services by Google) → Install voice data. பிரெஞ்சு, தமிழ் சேர்க்கவும்.",
-      "iPhone / iPad: Settings → Accessibility → Spoken Content → Voices. பிரெஞ்சு, தமிழ் குரல்களைப் பதிவிறக்கவும்.",
+      "Android: Settings → Accessibility → Text-to-speech → Preferred engine (Speech Services by Google) → Install voice data. பிரெஞ்சு, {home} சேர்க்கவும்.",
+      "iPhone / iPad: Settings → Accessibility → Spoken Content → Voices. பிரெஞ்சு, {home} குரல்களைப் பதிவிறக்கவும்.",
       "குரலை நிறுவிய பிறகு இந்தப் பக்கத்தை மூடி மீண்டும் திறக்கவும்."
     ], close: "சரி",
-    sample: { en: "Hello! I can read with you.", fr: "Bonjour ! Je peux lire avec toi.", ta: "வணக்கம்! நான் உன்னுடன் படிப்பேன்." }
+    sample: SAMPLES
   }
+};
+CHECK.ne = {
+  title: "आवाज जाँच", intro: "पढेर सुनाउन यो उपकरणका आवाजहरू प्रयोग हुन्छन्। यहाँ हरेक भाषा जाँच गर।",
+  none: "यो ब्राउजरले पढेर सुनाउन सक्दैन। Chrome, Safari वा Silk प्रयोग गर।",
+  has: n => `आवाज भेटियो: ${n}`, missing: "यो भाषाको आवाज छैन।", loading: "आवाज खोज्दै…",
+  test: "जाँच", speed: "गति", slow: "बिस्तारै", fast: "छिटो",
+  tipsH: "आवाज आएन?", tips: [
+    "आवाज ठूलो गर। iPhone र iPad मा silent mode पनि बन्द गर।",
+    "Amazon Fire tablet: Settings → Accessibility → Text-to-Speech. हरेक भाषाको आवाज छान।",
+    "Android: Settings → Accessibility → Text-to-speech → Preferred engine (Speech Services by Google) → Install voice data. French र {home} थप।",
+    "iPhone / iPad: Settings → Accessibility → Spoken Content → Voices. French र {home} आवाज डाउनलोड गर।",
+    "नेपाली आवाज छैन भने हिन्दी आवाजले पनि नेपाली अक्षर पढ्छ।",
+    "आवाज थपेपछि यो पेज बन्द गरेर फेरि खोल।"
+  ], close: "ठिक छ", sample: SAMPLES
 };
 function openSoundCheck() {
   const d = $("#soundSheet");
   const draw = () => {
     const c = CHECK[lang];
-    const rows = ["en", "fr", "ta"].map(l => {
+    const rows = LANGS.map(l => {
       const list = Speech.voicesFor(l);
       const v = Speech.voiceFor(l);
       const status = !Speech.supported ? `<span class="status bad">${esc(c.none)}</span>`
@@ -401,19 +492,22 @@ function openSoundCheck() {
       const select = list.length > 1
         ? `<select id="voice-${l}" aria-label="${esc(UI.en.langName[l])} voice">${list.map(x => `<option value="${esc(x.name)}"${v && x.name === v.name ? " selected" : ""}>${esc(x.name)} (${esc(x.lang)})</option>`).join("")}</select>`
         : "";
-      return `<div class="voice-row"><div><b>${l === "en" ? "English" : l === "fr" ? "Français" : "தமிழ்"}</b><br>${status}</div>
+      return `<div class="voice-row"><div><b>${LANG_LABEL[l]}</b><br>${status}</div>
         <button type="button" class="btn alt" data-test="${l}">🔊 ${esc(c.test)}</button>${select}</div>`;
     }).join("");
     const speed = store.get("speed", 1);
     d.innerHTML = `<h2>${esc(c.title)}</h2><p class="hint">${esc(c.intro)}</p>${rows}
       <div class="speed"><span>${esc(c.slow)}</span><input type="range" id="speed" min="0.6" max="1.3" step="0.1" value="${speed}" aria-label="${esc(c.speed)}"><span>${esc(c.fast)}</span></div>
-      <b>${esc(c.tipsH)}</b><ul class="tips">${c.tips.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+      <b>${esc(c.tipsH)}</b><ul class="tips">${c.tips.map(x => `<li>${esc(replaceAll(x, "{home}", t().langName[HOME]))}</li>`).join("")}</ul>
+      ${problemLogHtml()}
       ${window.AndroidTTS && window.AndroidTTS.openSettings ? `<div class="btns"><button type="button" class="btn alt" id="ttsSettings">⚙️ Tablet speech settings</button></div>` : ""}
       <div class="btns" style="margin-top:12px"><button type="button" class="btn" id="closeCheck">${esc(c.close)}</button></div>`;
     d.querySelectorAll("[data-test]").forEach(b => b.onclick = () => say(c.sample[b.dataset.test], { lang: b.dataset.test }));
     d.querySelectorAll("select").forEach(s => s.onchange = () => { store.set("voice:" + s.id.slice(6), s.value); say(c.sample[s.id.slice(6)], { lang: s.id.slice(6) }); });
     $("#speed", d).onchange = e => store.set("speed", +e.target.value);
     $("#closeCheck", d).onclick = () => d.close();
+    const clearLog = $("#clearLog", d);
+    if (clearLog) clearLog.onclick = () => { store.set("problems", []); draw(); };
     const ts = $("#ttsSettings", d);
     if (ts) ts.onclick = () => window.AndroidTTS.openSettings();
   };
@@ -424,14 +518,15 @@ function openSoundCheck() {
 }
 
 /* ---------------------------------------------------------------- word data */
-const pictures = { en: [], fr: [], ta: [] };
-const picByWord = { en: new Map(), fr: new Map(), ta: new Map() };
+const pictures = {};
+const picByWord = {};
+LANGS.forEach(l => { pictures[l] = []; picByWord[l] = new Map(); });
 const wordPools = {};
 function prepareData() {
   const drawable = DATA.pictures.filter(p => emojiOK(p.e));
   const usable = drawable.length >= 40 ? drawable : DATA.pictures;
   for (const p of usable) {
-    for (const l of ["en", "fr", "ta"]) {
+    for (const l of LANGS) {
       if (!p[l]) continue;
       pictures[l].push(p);
       if (!picByWord[l].has(p[l].toLowerCase())) picByWord[l].set(p[l].toLowerCase(), p.e);
@@ -440,7 +535,7 @@ function prepareData() {
 }
 function levelOf(l, syl, word) {
   const n = syl.length;
-  if (l === "ta") { const g = graphemes(word).length; return g <= 2 ? 1 : g <= 4 ? 2 : 3; }
+  if (l === "ta" || l === "ne") return n <= 2 ? 1 : n <= 3 ? 2 : 3;
   const len = word.length;
   if (l === "en") return n === 1 && len <= 4 ? 1 : n <= 2 && len <= 7 ? 2 : 3;
   return n <= 2 && len <= 5 ? 1 : n <= 2 ? 2 : 3;
@@ -482,7 +577,18 @@ const G = {
     }
   }
 };
+G.ne = {
+  // "एउटा" (one/a) before things you can count; nothing before milk, rice and so on.
+  euta: p => p.enm || p.c === "drink" ? "" : "एउटा "
+};
 const FAMILY = new Set(["👩", "👨", "👵", "👴", "👶"]);
+// Body words that make odd sentences ("I can touch my brain"), and drinks that are not for children.
+const INSIDE_BODY = new Set(["🧠", "❤️"]);
+const GROWN_UP_DRINK = new Set(["☕"]);
+const okFor = p => !GROWN_UP_DRINK.has(p.e);
+const touchable = p => p.c === "body" && !INSIDE_BODY.has(p.e);
+// Tamil: no "ஒரு" (a/one) before things you cannot count, like milk or rice.
+const oru = p => p.enm || p.c === "drink" ? "" : "ஒரு ";
 
 // Sentence patterns. Each returns text for a picture word, or null if it does not fit.
 const SENTENCES = {
@@ -502,13 +608,13 @@ const SENTENCES = {
     p => p.c === "animal" && `Hello, little ${p.en}!`,
     p => p.c === "food" && `{n} eats ${G.en.a(p)}.`,
     p => p.c === "food" && `Yum! The ${p.en} is good.`,
-    p => p.c === "drink" && `{n} drinks some ${p.en}.`,
-    p => p.c === "drink" && `The ${p.en} is cold.`,
+    p => p.c === "drink" && okFor(p) && `{n} drinks some ${p.en}.`,
+    p => p.c === "drink" && okFor(p) && `The ${p.en} is cold.`,
     p => p.c === "vehicle" && `The ${p.en} goes fast.`,
     p => p.c === "vehicle" && `{n} can see the ${p.en}.`,
     p => p.c === "clothes" && `{n} puts on her ${p.en}.`,
-    p => (p.c === "thing" || p.c === "body") && `This is my ${p.en}.`,
-    p => p.c === "body" && `I can touch my ${p.en}.`,
+    p => (p.c === "thing" || touchable(p)) && `This is my ${p.en}.`,
+    p => touchable(p) && `I can touch my ${p.en}.`,
     p => p.c === "nature" && `The ${p.en} is pretty.`,
     p => p.c === "place" && `{n} goes to the ${p.en}.`,
     p => FAMILY.has(p.e) && `I love my ${p.en}.`,
@@ -530,22 +636,22 @@ const SENTENCES = {
     p => p.c === "animal" && !frElide(p.fr) && [`Bonjour, ${G.fr.adj(p, "petit", "petite")} ${p.fr} !`, `Hello, little ${p.en}!`],
     p => p.c === "food" && [`{n} mange ${G.fr.un(p)}.`, `{n} eats ${G.en.a(p)}.`],
     p => p.c === "food" && [`Miam ! ${cap(G.fr.le(p))} est ${G.fr.adj(p, "bon", "bonne")}.`, `Yum! The ${p.en} is good.`],
-    p => p.c === "drink" && [`{n} boit ${G.fr.du(p)}.`, `{n} drinks some ${p.en}.`],
+    p => p.c === "drink" && okFor(p) && [`{n} boit ${G.fr.du(p)}.`, `{n} drinks some ${p.en}.`],
     p => p.c === "vehicle" && [`${cap(G.fr.le(p))} va vite.`, `The ${p.en} goes fast.`],
     p => p.c === "clothes" && [`{n} met ${G.fr.son(p)}.`, `{n} puts on her ${p.en}.`],
-    p => (p.c === "thing" || p.c === "body") && [`C'est ${G.fr.mon(p)}.`, `This is my ${p.en}.`],
-    p => p.c === "body" && [`Je touche ${G.fr.mon(p)}.`, `I touch my ${p.en}.`],
+    p => (p.c === "thing" || touchable(p)) && [`C'est ${G.fr.mon(p)}.`, `This is my ${p.en}.`],
+    p => touchable(p) && [`Je touche ${G.fr.mon(p)}.`, `I touch my ${p.en}.`],
     p => p.c === "nature" && [`${cap(G.fr.le(p))} est ${G.fr.adj(p, "joli", "jolie")}.`, `The ${p.en} is pretty.`],
     p => p.c === "place" && [`{n} va ${G.fr.au(p)}.`, `{n} goes to the ${p.en}.`],
     p => FAMILY.has(p.e) && [`J'aime ${G.fr.mon(p)}.`, `I love my ${p.en}.`],
     p => FAMILY.has(p.e) && [`Bonjour, ${p.fr} !`, `Hello, ${p.en}!`]
   ],
   ta: [
-    p => p.c !== "people" && [`இது ஒரு ${p.ta}.`, `This is ${G.en.a(p)}.`],
-    p => p.c !== "people" && [`அங்கே ஒரு ${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`],
+    p => p.c !== "people" && [`இது ${oru(p)}${p.ta}.`, `This is ${G.en.a(p)}.`],
+    p => p.c !== "people" && [`அங்கே ${oru(p)}${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`],
     p => p.c !== "people" && [`${p.ta} எங்கே?`, `Where is the ${p.en}?`],
-    p => p.c !== "people" && [`இதோ ஒரு ${p.ta}!`, `Here is ${G.en.a(p)}!`],
-    p => p.c !== "people" && [`பார்! ஒரு ${p.ta}!`, `Look! ${cap(G.en.a(p))}!`],
+    p => p.c !== "people" && [`இதோ ${oru(p)}${p.ta}!`, `Here is ${G.en.a(p)}!`],
+    p => p.c !== "people" && [`பார்! ${oru(p)}${p.ta}!`, `Look! ${cap(G.en.a(p))}!`],
     p => p.c !== "body" && (p.c !== "people" || FAMILY.has(p.e)) && [`${G.ta.join("எனக்கு", p.ta)} பிடிக்கும்.`, `I like ${FAMILY.has(p.e) ? "my " + p.en : p.enm ? p.en : "the " + p.en}.`],
     p => ["animal", "thing", "vehicle", "nature", "place"].includes(p.c) && [`${p.ta} பெரியது.`, `The ${p.en} is big.`],
     p => ["animal", "thing", "vehicle", "food"].includes(p.c) && [`${p.ta} சிறியது.`, `The ${p.en} is small.`],
@@ -554,9 +660,9 @@ const SENTENCES = {
     p => p.c === "animal" && [`${p.ta} விளையாடுகிறது.`, `The ${p.en} is playing.`],
     p => (p.c === "animal" || FAMILY.has(p.e)) && [`வணக்கம், ${p.ta}!`, `Hello, ${p.en}!`],
     p => p.c === "food" && [`{n} ${p.ta} சாப்பிடுகிறாள்.`, `{n} is eating ${G.en.a(p)}.`],
-    p => p.c === "drink" && [`{n} ${p.ta} குடிக்கிறாள்.`, `{n} is drinking ${p.en}.`],
+    p => p.c === "drink" && okFor(p) && [`{n} ${p.ta} குடிக்கிறாள்.`, `{n} is drinking ${p.en}.`],
     p => p.c === "vehicle" && [`${p.ta} வேகமாகப் போகிறது.`, `The ${p.en} goes fast.`],
-    p => ["thing", "clothes", "body"].includes(p.c) && [`இது என் ${p.ta}.`, `This is my ${p.en}.`],
+    p => (["thing", "clothes"].includes(p.c) || touchable(p)) && [`இது என் ${p.ta}.`, `This is my ${p.en}.`],
     p => ["thing", "clothes"].includes(p.c) && [`{n}விடம் ஒரு ${p.ta} இருக்கிறது.`, `{n} has ${G.en.a(p)}.`]
   ]
 };
@@ -587,6 +693,36 @@ const HANDWRITTEN = {
     ["வாத்து குளத்தில் இருக்கிறது.", "The duck is in the pond."], ["{n} புத்தகம் படிக்கிறாள்.", "{n} is reading a book."],
     ["குழந்தை தூங்குகிறது.", "The baby is sleeping."], ["வானவில்லைப் பார்!", "Look at the rainbow!"]]
 };
+// Nepali patterns use the girl's verb forms (खान्छे "she eats"), and "एउटा"
+// (one/a) only before things you can count.
+SENTENCES.ne = [
+  p => p.c !== "people" && [`यो ${G.ne.euta(p)}${p.ne} हो।`, `This is ${G.en.a(p)}.`],
+  p => p.c !== "people" && [`त्यहाँ ${G.ne.euta(p)}${p.ne} छ।`, `There is ${G.en.a(p)} over there.`],
+  p => p.c !== "people" && [`${p.ne} कहाँ छ?`, `Where is the ${p.en}?`],
+  p => p.c !== "people" && [`हेर! ${G.ne.euta(p)}${p.ne}!`, `Look! ${cap(G.en.a(p))}!`],
+  p => p.c !== "body" && (p.c !== "people" || FAMILY.has(p.e)) && [`मलाई ${p.ne} मन पर्छ।`, `I like ${FAMILY.has(p.e) ? "my " + p.en : p.enm ? p.en : "the " + p.en}.`],
+  p => ["animal", "thing", "vehicle", "nature", "place"].includes(p.c) && !p.enm && [`${p.ne} ठूलो छ।`, `The ${p.en} is big.`],
+  p => ["animal", "thing", "vehicle", "food"].includes(p.c) && !p.enm && [`${p.ne} सानो छ।`, `The ${p.en} is small.`],
+  p => ["animal", "nature", "place", "thing"].includes(p.c) && [`${p.ne} राम्रो छ।`, `The ${p.en} is pretty.`],
+  p => p.c === "animal" && [`${p.ne} सुतिरहेको छ।`, `The ${p.en} is sleeping.`],
+  p => p.c === "animal" && [`${p.ne} खेलिरहेको छ।`, `The ${p.en} is playing.`],
+  p => (p.c === "animal" || FAMILY.has(p.e)) && [`नमस्ते, ${p.ne}!`, `Hello, ${p.en}!`],
+  p => p.c === "food" && [`{n} ${p.ne} खान्छे।`, `{n} eats ${G.en.a(p)}.`],
+  p => p.c === "drink" && okFor(p) && [`{n} ${p.ne} पिउँछे।`, `{n} drinks some ${p.en}.`],
+  p => p.c === "vehicle" && [`${p.ne} छिटो जान्छ।`, `The ${p.en} goes fast.`],
+  p => (["thing", "clothes"].includes(p.c) || touchable(p)) && [`यो मेरो ${p.ne} हो।`, `This is my ${p.en}.`],
+  p => ["thing", "clothes"].includes(p.c) && [`{n}सँग ${G.ne.euta(p)}${p.ne} छ।`, `{n} has ${G.en.a(p)}.`]
+];
+HANDWRITTEN.ne = [["{n} पढ्छे!", "{n} can read!"], ["बिरालो चकटीमा छ।", "The cat is on the mat."],
+  ["कुकुर छिटो दौडन्छ।", "The dog runs fast."], ["म ठूलो घाम देख्छु।", "I see the big sun."],
+  ["{n}लाई उफ्रन मन पर्छ।", "{n} likes to jump."], ["माछा पौडी खेल्छ।", "The fish swims."],
+  ["शुभ रात्रि, {n}।", "Good night, {n}."], ["हामी पार्क जान्छौँ।", "We are going to the park."],
+  ["चरा रुखमा छ।", "The bird is in the tree."], ["आमा र बुबा {n}लाई माया गर्नुहुन्छ।", "Mom and Dad love {n}."],
+  ["आज घाम लागेको छ।", "It is sunny today."], ["भ्यागुतो उफ्रन्छ।", "The frog jumps."],
+  ["मसँग रातो टोपी छ।", "I have a red hat."], ["बस ठूलो र पहेँलो छ।", "The bus is big and yellow."],
+  ["के तिमीले जून देख्यौ?", "Did you see the moon?"], ["हामीलाई खेल्न मन पर्छ।", "We like to play."],
+  ["हाँस पोखरीमा छ।", "The duck is in the pond."], ["{n} किताब पढ्छे।", "{n} reads a book."],
+  ["बच्चा सुतिरहेको छ।", "The baby is sleeping."], ["इन्द्रेणी हेर!", "Look at the rainbow!"]];
 const sentencePools = {};
 function sentencesFor(l) {
   if (sentencePools[l]) return sentencePools[l];
@@ -640,17 +776,35 @@ const STORY = {
     home: [["{n} à la maison", "{n} at Home"], ["{n} fait le tour de la maison.", "{n} looks around the house."], [p => [`Voici ${G.fr.un(p)}.`, `Here is ${G.en.a(p)}.`], p => [`{n} voit ${G.fr.un(p)}.`, `{n} sees ${G.en.a(p)}.`]], ["On est bien chez soi !", "There's no place like home!"]]
   },
   ta: {
-    zoo: [["மிருகக்காட்சிசாலையில் {n}", "{n} at the Zoo"], ["{n} மிருகக்காட்சிசாலைக்குப் போகிறாள்.", "{n} goes to the zoo."], [p => [`இதோ ஒரு ${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ஒரு ${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ஒரு ${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`], p => [`வணக்கம், ${p.ta}!`, `Hello, ${p.en}!`]], ["டாட்டா! மீண்டும் வருவோம்.", "Bye-bye! We will come again."]],
-    farm: [["பண்ணையில் {n}", "{n} on the Farm"], ["{n} பண்ணைக்குப் போகிறாள்.", "{n} goes to the farm."], [p => [`இதோ ஒரு ${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ஒரு ${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ஒரு ${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`]], ["டாட்டா, பண்ணை!", "Bye-bye, farm!"]],
-    sea: [["கடலுக்கு அடியில் {n}", "{n} Under the Sea"], ["{n} கடலுக்குள் நீந்துகிறாள்.", "{n} swims into the sea."], [p => [`இதோ ஒரு ${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ஒரு ${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ஒரு ${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`]], ["வீட்டுக்குப் போகும் நேரம்!", "Time to go home!"]],
-    garden: [["{n}வின் தோட்டம்", "{n}'s Garden"], ["{n} தோட்டத்துக்குப் போகிறாள்.", "{n} goes to the garden."], [p => [`இதோ ஒரு ${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ஒரு ${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ஒரு ${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`]], ["எவ்வளவு அழகான தோட்டம்!", "What a beautiful garden!"]],
+    zoo: [["மிருகக்காட்சிசாலையில் {n}", "{n} at the Zoo"], ["{n} மிருகக்காட்சிசாலைக்குப் போகிறாள்.", "{n} goes to the zoo."], [p => [`இதோ ${oru(p)}${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ${oru(p)}${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ${oru(p)}${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`], p => [`வணக்கம், ${p.ta}!`, `Hello, ${p.en}!`]], ["டாட்டா! மீண்டும் வருவோம்.", "Bye-bye! We will come again."]],
+    farm: [["பண்ணையில் {n}", "{n} on the Farm"], ["{n} பண்ணைக்குப் போகிறாள்.", "{n} goes to the farm."], [p => [`இதோ ${oru(p)}${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ${oru(p)}${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ${oru(p)}${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`]], ["டாட்டா, பண்ணை!", "Bye-bye, farm!"]],
+    sea: [["கடலுக்கு அடியில் {n}", "{n} Under the Sea"], ["{n} கடலுக்குள் நீந்துகிறாள்.", "{n} swims into the sea."], [p => [`இதோ ${oru(p)}${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ${oru(p)}${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ${oru(p)}${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`]], ["வீட்டுக்குப் போகும் நேரம்!", "Time to go home!"]],
+    garden: [["{n}வின் தோட்டம்", "{n}'s Garden"], ["{n} தோட்டத்துக்குப் போகிறாள்.", "{n} goes to the garden."], [p => [`இதோ ${oru(p)}${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ${oru(p)}${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ${oru(p)}${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`]], ["எவ்வளவு அழகான தோட்டம்!", "What a beautiful garden!"]],
     market: [["சந்தையில் {n}", "{n} at the Market"], ["{n} அம்மாவுடன் சந்தைக்குப் போகிறாள்.", "{n} goes to the market with Mom."], [p => [`{n} ${p.ta} வாங்குகிறாள்.`, `{n} buys ${G.en.a(p)}.`], p => [`இதோ ${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`அம்மா ${p.ta} வாங்குகிறார்.`, `Mom buys ${G.en.a(p)}.`]], ["பை நிறைந்துவிட்டது!", "The bag is full!"]],
-    toys: [["{n}வின் பொம்மைப் பெட்டி", "{n}'s Toy Box"], ["{n} தன் பொம்மைப் பெட்டியைத் திறக்கிறாள்.", "{n} opens her toy box."], [p => [`இதோ ஒரு ${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`{n}விடம் ஒரு ${p.ta} இருக்கிறது.`, `{n} has ${G.en.a(p)}.`], p => [`பார்! ஒரு ${p.ta}!`, `Look! ${cap(G.en.a(p))}!`]], ["எல்லாவற்றையும் எடுத்து வைப்போம்!", "Let's put everything away!"]],
-    sky: [["வானத்தைப் பார்!", "Look at the Sky!"], ["{n} வானத்தைப் பார்க்கிறாள்.", "{n} looks at the sky."], [p => [`பார்! ஒரு ${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`வானத்தில் ஒரு ${p.ta}!`, `${cap(G.en.a(p))} in the sky!`]], ["வானம் எவ்வளவு பெரியது!", "How big the sky is!"]],
-    town: [["ஊரில் {n}", "{n} in Town"], ["{n} ஊரைச் சுற்றிப் பார்க்கிறாள்.", "{n} looks around town."], [p => [`இதோ ஒரு ${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ஒரு ${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ஒரு ${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`]], ["வீட்டுக்குத் திரும்புவோம்!", "Let's go back home!"]],
-    home: [["வீட்டில் {n}", "{n} at Home"], ["{n} வீட்டைச் சுற்றிப் பார்க்கிறாள்.", "{n} looks around the house."], [p => [`இதோ ஒரு ${p.ta}.`, `Here is ${G.en.a(p)}.`], p => [`இது நம் ${G.ta.join("வீட்டு", p.ta)}.`, `This is our house's ${p.en}.`]], ["வீடு எவ்வளவு இனிமையானது!", "Home is so sweet!"]]
+    toys: [["{n}வின் பொம்மைப் பெட்டி", "{n}'s Toy Box"], ["{n} தன் பொம்மைப் பெட்டியைத் திறக்கிறாள்.", "{n} opens her toy box."], [p => [`இதோ ${oru(p)}${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`{n}விடம் ஒரு ${p.ta} இருக்கிறது.`, `{n} has ${G.en.a(p)}.`], p => [`பார்! ${oru(p)}${p.ta}!`, `Look! ${cap(G.en.a(p))}!`]], ["எல்லாவற்றையும் எடுத்து வைப்போம்!", "Let's put everything away!"]],
+    sky: [["வானத்தைப் பார்!", "Look at the Sky!"], ["{n} வானத்தைப் பார்க்கிறாள்.", "{n} looks at the sky."], [p => [`பார்! ${oru(p)}${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`வானத்தில் ${oru(p)}${p.ta}!`, `${cap(G.en.a(p))} in the sky!`]], ["வானம் எவ்வளவு பெரியது!", "How big the sky is!"]],
+    town: [["ஊரில் {n}", "{n} in Town"], ["{n} ஊரைச் சுற்றிப் பார்க்கிறாள்.", "{n} looks around town."], [p => [`இதோ ${oru(p)}${p.ta}!`, `Here is ${G.en.a(p)}!`], p => [`பார்! ${oru(p)}${p.ta}!`, `Look! ${cap(G.en.a(p))}!`], p => [`அங்கே ${oru(p)}${p.ta} இருக்கிறது.`, `There is ${G.en.a(p)} over there.`]], ["வீட்டுக்குத் திரும்புவோம்!", "Let's go back home!"]],
+    home: [["வீட்டில் {n}", "{n} at Home"], ["{n} வீட்டைச் சுற்றிப் பார்க்கிறாள்.", "{n} looks around the house."], [p => [`இதோ ${oru(p)}${p.ta}.`, `Here is ${G.en.a(p)}.`], p => [`இது நம் ${G.ta.join("வீட்டு", p.ta)}.`, `This is our ${p.en}.`]], ["வீடு எவ்வளவு இனிமையானது!", "Home is so sweet!"]]
   }
 };
+{
+  const eu = p => G.ne.euta(p);
+  const look = p => [`हेर! ${eu(p)}${p.ne}!`, `Look! ${cap(G.en.a(p))}!`];
+  const there = p => [`त्यहाँ ${eu(p)}${p.ne} छ।`, `There is ${G.en.a(p)} over there.`];
+  const here = p => [`यहाँ ${eu(p)}${p.ne} छ!`, `Here is ${G.en.a(p)}!`];
+  const hello = p => [`नमस्ते, ${p.ne}!`, `Hello, ${p.en}!`];
+  STORY.ne = {
+    zoo: [["चिडियाखानामा {n}", "{n} at the Zoo"], ["{n} चिडियाखाना जान्छे।", "{n} goes to the zoo."], [look, there, hello], ["बाइबाइ! फेरि आउँला।", "Bye-bye! We will come again."]],
+    farm: [["फार्ममा {n}", "{n} on the Farm"], ["{n} फार्म जान्छे।", "{n} goes to the farm."], [look, there, hello], ["बाइबाइ, फार्म!", "Bye-bye, farm!"]],
+    sea: [["समुद्रमुनि {n}", "{n} Under the Sea"], ["{n} समुद्रमा पौडी खेल्छे।", "{n} swims in the sea."], [look, there, hello], ["घर फर्कने बेला भयो!", "Time to go home!"]],
+    garden: [["{n}को बगैँचा", "{n}'s Garden"], ["{n} बगैँचामा जान्छे।", "{n} goes to the garden."], [look, there, here], ["कति राम्रो बगैँचा!", "What a beautiful garden!"]],
+    market: [["बजारमा {n}", "{n} at the Market"], ["{n} आमासँग बजार जान्छे।", "{n} goes to the market with Mom."], [p => [`{n} ${p.ne} किन्छे।`, `{n} buys ${G.en.a(p)}.`], here, p => [`आमा ${p.ne} किन्नुहुन्छ।`, `Mom buys ${G.en.a(p)}.`]], ["झोला भरियो!", "The bag is full!"]],
+    toys: [["{n}को खेलौनाको बाकस", "{n}'s Toy Box"], ["{n} आफ्नो खेलौनाको बाकस खोल्छे।", "{n} opens her toy box."], [here, p => [`{n}सँग ${eu(p)}${p.ne} छ।`, `{n} has ${G.en.a(p)}.`], look], ["अब सबै मिलाएर राखौँ!", "Let's put everything away!"]],
+    sky: [["आकाश हेर!", "Look at the Sky!"], ["{n} आकाशतिर हेर्छे।", "{n} looks up at the sky."], [look, p => [`आकाशमा ${eu(p)}${p.ne}!`, `${cap(G.en.a(p))} in the sky!`]], ["आकाश कति ठूलो!", "How big the sky is!"]],
+    town: [["सहरमा {n}", "{n} in Town"], ["{n} सहर घुम्छे।", "{n} walks around town."], [here, look, there], ["घर फर्कौँ!", "Let's go back home!"]],
+    home: [["घरमा {n}", "{n} at Home"], ["{n} आफ्नो घर हेर्छे।", "{n} looks around her house."], [here, p => [`यो हाम्रो ${p.ne} हो।`, `This is our ${p.en}.`]], ["आफ्नो घर, प्यारो घर!", "Home, sweet home!"]]
+  };
+}
 function themeItems(theme, l) {
   const set = theme.pool ? new Set(graphemes(theme.pool)) : null;
   return pictures[l].filter(p => set ? set.has(p.e) : theme.cats.includes(p.c));
@@ -678,7 +832,7 @@ function drawBackdrop() {
   const spots = [[-4,4,18,-8],[40,-2,11,6],[62,30,22,-4],[-8,48,14,10],[30,62,24,-6],[70,78,12,8],[8,86,16,-3],[50,14,8,12]];
   spots.forEach(([x, y, size, r], i) => {
     const s = document.createElement("span");
-    s.textContent = i % 3 === 1 ? NAMES.ta : CHILD;
+    s.textContent = i % 3 === 1 ? (NAMES[HOME] || CHILD) : CHILD;
     s.style.left = x + "vw"; s.style.top = y + "vh";
     s.style.fontSize = size + "vw";
     s.style.color = COLORS[i % COLORS.length];
@@ -698,6 +852,17 @@ function drawName() {
     b.style.color = COLORS[i % COLORS.length];
     b.onclick = () => { b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); say(ch); };
     h.appendChild(b);
+  });
+}
+function drawLangButtons() {
+  const box = $("#langs");
+  if (!box || box.childElementCount) return;
+  LANGS.forEach(l => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.lang = l;
+    b.textContent = LANG_LABEL[l];
+    box.appendChild(b);
   });
 }
 function renderChrome() {
@@ -856,7 +1021,7 @@ function viewWords() {
     <div class="btns">
       <button class="btn alt" id="prevW" type="button"${view.at ? "" : " disabled"}>◀ ${tt("prev")}</button>
       <button class="btn" id="hearW" type="button">🔊 ${tt("hear")}</button>
-      <button class="btn go" id="nextW" type="button">${tt("next")} ▶</button>
+      <button class="btn go" id="nextW" type="button">${esc(t().next)} ▶${enUnder(UI.en.next)}</button>
     </div>
     <p class="meta">${esc(t().wordCount(Math.max(1, deckPos(key) - (view.history.length - 1 - view.at)), pool.length))}</p>`;
   panel.appendChild(stage);
@@ -902,7 +1067,7 @@ function viewRead() {
       ${showEn() && item.en ? `<p class="gloss big">${esc(fillEn(item.en))}</p>` : ""}
       <div class="btns">
         <button class="btn" id="readMe" type="button">🔊 ${tt("readMe")}</button>
-        <button class="btn go" id="nextS" type="button">${tt("next")} ▶</button>
+        <button class="btn go" id="nextS" type="button">${esc(t().next)} ▶${enUnder(UI.en.next)}</button>
       </div>
     </div>
     <p class="meta">${esc(t().sentCount(deckPos(key), pool.length))}</p>`;
@@ -1020,9 +1185,9 @@ function roundMissing(body) {
     const spots = letters.map((g, i) => i).filter(i => /\p{L}/u.test(letters[i]));
     const at = pick(spots);
     const right = letters[at].toLowerCase();
-    const alphabet = lang === "ta"
-      ? [...new Set(pictures.ta.flatMap(p => graphemes(p.ta)))].filter(g => /\p{L}/u.test(g))
-      : [..."abcdefghijklmnopqrstuvwxyz"];
+    const alphabet = lang === "en" || lang === "fr"
+      ? [..."abcdefghijklmnopqrstuvwxyz"]
+      : [...new Set(pictures[lang].flatMap(p => graphemes(p[lang])))].filter(g => /\p{L}/u.test(g));
     const wrong = shuffle(alphabet.filter(g => g.toLowerCase() !== right)).slice(0, 2);
     view.cur = { target, letters, at, right, options: shuffle([right, ...wrong]) };
   }
@@ -1051,10 +1216,11 @@ function roundMissing(body) {
 
 /* ---------------------------------------------------------------- books */
 const LIBRARIES = [
-  { name: "StoryWeaver", url: "https://storyweaver.org.in/", langs: ["en", "fr", "ta"],
-    note: { en: "Thousands of free picture books in English, French and Tamil, sorted by reading level.",
-            fr: "Des milliers d'albums gratuits en anglais, français et tamoul, classés par niveau.",
-            ta: "ஆங்கிலம், பிரெஞ்சு, தமிழில் ஆயிரக்கணக்கான இலவசப் படக்கதைப் புத்தகங்கள், நிலை வாரியாக." } },
+  { name: "StoryWeaver", url: "https://storyweaver.org.in/", langs: ["en", "fr", "ta", "ne"],
+    note: { en: "Thousands of free picture books in English, French, Tamil and Nepali, sorted by reading level.",
+            fr: "Des milliers d'albums gratuits en anglais, français, tamoul et népalais, classés par niveau.",
+            ta: "ஆங்கிலம், பிரெஞ்சு, தமிழில் ஆயிரக்கணக்கான இலவசப் படக்கதைப் புத்தகங்கள், நிலை வாரியாக.",
+            ne: "अङ्ग्रेजी, फ्रेन्च र नेपालीमा हजारौँ निःशुल्क चित्र-किताब, तह अनुसार।" } },
   { name: "Unite for Literacy", url: "https://www.uniteforliteracy.com/", langs: ["en", "fr"],
     note: { en: "Free picture books with read-aloud narration.", fr: "Albums gratuits avec narration audio.", ta: "" } },
   { name: "Starfall", url: "https://www.starfall.com/", langs: ["en"],
@@ -1174,6 +1340,7 @@ function numWord(n, l = lang) {
     if (t === 9) return "quatre-vingt-" + FR_ONES[10 + u];
     return FR_TENS[t] + (u === 1 ? " et un" : u ? "-" + FR_ONES[u] : "");
   }
+  if (l === "ne") return NE_NUMS[n];
   if (n < 20) return TA_ONES[n];
   if (n === 100) return "நூறு";
   const t = n / 10 | 0, u = n % 10;
@@ -1183,7 +1350,20 @@ function numWord(n, l = lang) {
   const sign = TA_VOWEL_SIGN[unit[0]];
   return sign ? stem + c + sign + unit.slice(1) : stem + c + "ு" + unit;
 }
+// Nepali numbers 0 to 100 are learned as words; there is no simple rule.
+const NE_NUMS = ["शून्य","एक","दुई","तीन","चार","पाँच","छ","सात","आठ","नौ","दस",
+  "एघार","बाह्र","तेह्र","चौध","पन्ध्र","सोह्र","सत्र","अठार","उन्नाइस","बीस",
+  "एक्काइस","बाइस","तेइस","चौबिस","पच्चिस","छब्बिस","सत्ताइस","अट्ठाइस","उनन्तिस","तिस",
+  "एकतिस","बत्तिस","तेत्तिस","चौँतिस","पैँतिस","छत्तिस","सैँतिस","अठतिस","उनन्चालिस","चालिस",
+  "एकचालिस","बयालिस","त्रिचालिस","चवालिस","पैँतालिस","छयालिस","सतचालिस","अठचालिस","उनन्चास","पचास",
+  "एकाउन्न","बाउन्न","त्रिपन्न","चउन्न","पचपन्न","छपन्न","सन्ताउन्न","अन्ठाउन्न","उनन्साठी","साठी",
+  "एकसट्ठी","बयसट्ठी","त्रिसट्ठी","चौसट्ठी","पैँसट्ठी","छयसट्ठी","सतसट्ठी","अठसट्ठी","उनन्सत्तरी","सत्तरी",
+  "एकहत्तर","बहत्तर","त्रिहत्तर","चौहत्तर","पचहत्तर","छयहत्तर","सतहत्तर","अठहत्तर","उनासी","असी",
+  "एकासी","बयासी","त्रियासी","चौरासी","पचासी","छयासी","सतासी","अठासी","उनान्नब्बे","नब्बे",
+  "एकानब्बे","बयानब्बे","त्रियानब्बे","चौरानब्बे","पन्चानब्बे","छयानब्बे","सन्तानब्बे","अन्ठानब्बे","उनान्सय","सय"];
 const taDigits = n => String(n).replace(/\d/g, d => "௦௧௨௩௪௫௬௭௮௯"[d]);
+const neDigits = n => String(n).replace(/\d/g, d => "०१२३४५६७८९"[d]);
+const homeDigits = n => lang === "ta" ? taDigits(n) : lang === "ne" ? neDigits(n) : "";
 
 /* ---------------------------------------------------------------- extra text */
 Object.assign(UI.en, {
@@ -1196,168 +1376,258 @@ Object.assign(UI.fr, {
   cnH: "Couleurs et nombres", cnModes: ["Couleurs", "Nombres de 0 à 20", "Nombres jusqu'à 100", "Jeu des couleurs", "Jeu des nombres"],
   tapHear: "Touche pour écouter.", findColor: "Touche cette couleur :", findNumber: "Touche ce nombre :"
 });
+Object.assign(UI.ne, {
+  mathH: "गणित", grade: g => `कक्षा ${g}`, question: "सुन",
+  cnH: "रङ र अङ्क", cnModes: ["रङहरू", "अङ्क ० देखि २०", "१०० सम्मका अङ्क", "रङ खेल", "अङ्क खेल"],
+  tapHear: "कुनै पनि छोएर सुन।", findColor: "यो रङ छोऊ:", findNumber: "यो अङ्क छोऊ:"
+});
 Object.assign(UI.ta, {
   mathH: "கணக்கு", grade: g => `${g}ஆம் வகுப்பு`, question: "கேள்",
   cnH: "நிறங்களும் எண்களும்", cnModes: ["நிறங்கள்", "எண்கள் 0 முதல் 20", "100 வரை எண்கள்", "நிற விளையாட்டு", "எண் விளையாட்டு"],
   tapHear: "எதையும் தொட்டால் கேட்கலாம்.", findColor: "இந்த நிறத்தைத் தொடு:", findNumber: "இந்த எண்ணைத் தொடு:"
 });
 
-/* ---------------------------------------------------------------- Tamil letters */
+/* ---------------------------------------------------------------- script letters (Tamil, Nepali) */
+// One letters screen for scripts where a consonant joins with vowel signs:
+// Tamil uyirmei (க + ா = கா) and Nepali barahkhari (क + ा = का).
 const TA_VOWELS = [["அ","a"],["ஆ","aa"],["இ","i"],["ஈ","ii"],["உ","u"],["ஊ","uu"],["எ","e"],["ஏ","ee"],["ஐ","ai"],["ஒ","o"],["ஓ","oo"],["ஔ","au"]];
 const TA_SIGNS = ["", "ா", "ி", "ீ", "ு", "ூ", "ெ", "ே", "ை", "ொ", "ோ", "ௌ"];
 const TA_CONS = [["க","k"],["ங","ng"],["ச","ch"],["ஞ","nj"],["ட","ṭ"],["ண","ṇ"],["த","th"],["ந","n"],["ப","p"],["ம","m"],["ய","y"],["ர","r"],["ல","l"],["வ","v"],["ழ","zh"],["ள","ḷ"],["ற","ṟ"],["ன","ṉ"]];
 const TA_GRANTHA = [["ஜ","j"],["ஷ","sh"],["ஸ","s"],["ஹ","h"],["க்ஷ","ksh"]];
 const TA_LETTER_EN = { "அம்மா": "mom", "ஆடு": "goat", "இலை": "leaf", "ஈ": "fly", "உப்பு": "salt", "ஊசி": "needle", "எலி": "mouse", "ஏணி": "ladder", "ஐந்து": "five", "ஒட்டகம்": "camel", "ஓடம்": "boat", "ஔவையார்": "Avvaiyar (a Tamil poet)", "கப்பல்": "ship", "சங்கு": "conch shell", "சட்டை": "shirt", "ஞாயிறு": "sun", "பட்டம்": "kite", "மணி": "bell", "தக்காளி": "tomato", "நண்டு": "crab", "பந்து": "ball", "மரம்": "tree", "யானை": "elephant", "ரோஜா": "rose", "பலூன்": "balloon", "வாத்து": "duck", "வாழைப்பழம்": "banana", "பள்ளி": "school", "பறவை": "bird", "மீன்": "fish", "ஜன்னல்": "window", "ஸ்கூட்டர்": "scooter", "ஹெலிகாப்டர்": "helicopter" };
-const TA_ALL = [
-  ...TA_VOWELS.map(([l, r]) => ({ l, r, kind: "uyir" })),
-  { l: "ஃ", r: "akh", kind: "aytham" },
-  ...TA_CONS.map(([c, r]) => ({ l: c + "்", r, kind: "mei", base: c })),
-  ...TA_CONS.flatMap(([c, cr]) => TA_VOWELS.map(([v, vr], i) => ({ l: c + TA_SIGNS[i], r: cr + vr, kind: "uyirmei", base: c, v })))
+
+const NE_VOWELS = [["अ","a"],["आ","aa"],["इ","i"],["ई","ii"],["उ","u"],["ऊ","uu"],["ऋ","ri"],["ए","e"],["ऐ","ai"],["ओ","o"],["औ","au"],["अं","am"],["अः","ah"]];
+// Barahkhari ("twelve letters"): each consonant with these twelve vowel forms.
+const NE_FAMILY_VOWELS = [["अ","a"],["आ","aa"],["इ","i"],["ई","ii"],["उ","u"],["ऊ","uu"],["ए","e"],["ऐ","ai"],["ओ","o"],["औ","au"],["अं","am"],["अः","ah"]];
+const NE_SIGNS = ["", "ा", "ि", "ी", "ु", "ू", "े", "ै", "ो", "ौ", "ं", "ः"];
+const NE_CONS = [["क","k"],["ख","kh"],["ग","g"],["घ","gh"],["ङ","ng"],["च","ch"],["छ","chh"],["ज","j"],["झ","jh"],["ञ","ny"],["ट","ṭ"],["ठ","ṭh"],["ड","ḍ"],["ढ","ḍh"],["ण","ṇ"],["त","t"],["थ","th"],["द","d"],["ध","dh"],["न","n"],["प","p"],["फ","ph"],["ब","b"],["भ","bh"],["म","m"],["य","y"],["र","r"],["ल","l"],["व","w"],["श","sh"],["ष","ṣh"],["स","s"],["ह","h"],["क्ष","ksh"],["त्र","tr"],["ज्ञ","gy"]];
+// Example word for each letter, as on a Nepali क ख chart: [letter, word, picture, English].
+const NE_EXAMPLES = [
+  ["अ","अण्डा","🥚","egg"],["आ","आँप","🥭","mango"],["इ","इन्द्रेणी","🌈","rainbow"],["ई","ईख","","sugarcane"],["उ","उल्लु","🦉","owl"],["ऊ","ऊन","🧶","wool"],
+  ["ऋ","ऋषि","🧘","wise man"],["ए","एक","1️⃣","one"],["ऐ","ऐना","🪞","mirror"],["ओ","ओखर","🌰","walnut"],["औ","औँलो","☝️","finger"],["अं","अंगुर","🍇","grapes"],
+  ["क","कमल","🪷","lotus"],["ख","खरायो","🐰","rabbit"],["ग","गमला","🪴","flowerpot"],["घ","घर","🏠","house"],["च","चरा","🐦","bird"],["छ","छाता","☂️","umbrella"],
+  ["ज","जहाज","✈️","airplane"],["झ","झण्डा","🚩","flag"],["ट","टमाटर","🍅","tomato"],["ठ","ठेला","🛒","cart"],["ड","डोको","🧺","basket"],["ढ","ढोल","🥁","drum"],
+  ["ण","बाण","🏹","arrow"],["त","तराजु","⚖️","scales"],["थ","थाल","🍽️","plate"],["द","दाँत","🦷","tooth"],["ध","धनुष","🏹","bow"],["न","नरिवल","🥥","coconut"],
+  ["प","पुतली","🦋","butterfly"],["फ","फूल","🌸","flower"],["ब","बाख्रा","🐐","goat"],["भ","भालु","🐻","bear"],["म","मकै","🌽","corn"],["य","याक","🐂","yak"],
+  ["र","रुख","🌳","tree"],["ल","लसुन","🧄","garlic"],["व","वन","🌲","forest"],["श","शंख","🐚","conch shell"],["ष","षट्कोण","","hexagon"],["स","सर्प","🐍","snake"],
+  ["ह","हात्ती","🐘","elephant"],["क्ष","क्षत्रिय","⚔️","warrior"],["त्र","त्रिशूल","🔱","trident"],["ज्ञ","ज्ञानी","📚","wise person"]
 ];
-let taHeard = new Set(store.get("taHeard", []));
-function taSay(item, opts) {
-  if (TA_ALL.includes(item) && !taHeard.has(item.l)) { taHeard.add(item.l); store.set("taHeard", [...taHeard]); }
-  // Dead consonants are recited with a lead-in vowel, the way children learn them: க் = "இக்".
-  const text = item.kind === "mei" ? "இ" + item.l : item.kind === "aytham" ? "அஃகு" : item.l;
-  say(text, { lang: "ta", rate: 0.7, ...opts });
+
+const SCRIPTS = {
+  ta: {
+    lang: "ta", heardKey: "taHeard",
+    title: ["தமிழ் எழுத்துகள்", "Tamil letters: 12 vowels + 18 consonants + 216 letter families + ஃ = 247"],
+    hint: ["ஒரு எழுத்தைத் தொட்டுக் கேள்.", "Tap a letter to hear it. The English letters under each one show how to say it."],
+    heard: (n, total) => [`நீ ${n} / ${total} எழுத்துகளைக் கேட்டிருக்கிறாய்`, `You have heard ${n} of ${total} letters`],
+    readAll: ["எல்லாவற்றையும் படி", "Read them all"], readRow: ["வரிசையைப் படி", "Read the row"],
+    which: ["எந்த எழுத்தைக் கேட்டாய்?", "Which letter did you hear?"],
+    modes: [["உயிர்", "Vowels · 12"], ["மெய்", "Consonants · 18"], ["உயிர்மெய்", "Letter families · 216"], ["அட்டவணை", "Full chart · 247"], ["கிரந்தம்", "Extra letters"], ["விளையாட்டு", "Letter game"]],
+    sections: {
+      vowels: ["உயிர் எழுத்துகள்", "Vowels: say them by themselves"],
+      cons: ["மெய் எழுத்துகள்", `Consonants: the dot on top (்) means "no vowel". We say க் as "ik".`],
+      family: (c, cr, i, n) => [`${c}் + உயிர் = ${c} வரிசை`, `The ${cr} family: ${c}் joined with each vowel (${i} of ${n})`],
+      chart: ["உயிர்மெய் அட்டவணை", "The full chart: each row is a consonant, each column is a vowel. Slide sideways to see it all."],
+      extra: ["கிரந்த எழுத்துகள்", "Extra letters used in words from other languages, like ஜன்னல் (window) and ஹெலிகாப்டர் (helicopter)"]
+    },
+    vowels: TA_VOWELS, familyVowels: TA_VOWELS, signs: TA_SIGNS, cons: TA_CONS, extraCons: TA_GRANTHA,
+    special: [{ l: "ஃ", r: "akh", kind: "special", speak: "அஃகு" }],
+    extraSingles: [{ l: "ஸ்ரீ", r: "shrii", kind: "extra" }],
+    consForm: c => c + "்",           // a consonant on its own is written with a pulli
+    consSpeak: c => "இ" + c + "்",    // and recited with a lead-in vowel: க் = "இக்"
+    consHow: c => `${c} + ் = ${c}்`,
+    example: l => { const e = LETTERS.ta.find(([L]) => L === l); return e && [e[1], e[2], TA_LETTER_EN[e[1]] || ""]; },
+    ui: () => UI.ta
+  },
+  ne: {
+    lang: "ne", heardKey: "neHeard",
+    title: ["नेपाली वर्णमाला", "The Nepali alphabet: 13 vowels and 36 consonants, and the barahkhari (each consonant with 12 vowel signs)"],
+    hint: ["एउटा अक्षर छोएर सुन।", "Tap a letter to hear it. The English letters under each one show how to say it."],
+    heard: (n, total) => [`तिमीले ${total} मध्ये ${n} अक्षर सुनिसक्यौ`, `You have heard ${n} of ${total} letters`],
+    readAll: ["सबै पढ", "Read them all"], readRow: ["लहर पढ", "Read the row"],
+    which: ["तिमीले कुन अक्षर सुन्यौ?", "Which letter did you hear?"],
+    modes: [["स्वर", "Vowels · 13"], ["व्यञ्जन", "Consonants · 36"], ["बाह्रखरी", "Barahkhari · 432"], ["तालिका", "Full chart"], ["खेल", "Letter game"]],
+    sections: {
+      vowels: ["स्वर वर्ण", "Vowels: they make a sound by themselves"],
+      cons: ["व्यञ्जन वर्ण", "Consonants: each one already has a short 'a' sound, like क = ka"],
+      family: (c, cr, i, n) => [`${c} को बाह्रखरी`, `The ${cr} family: ${c} with each vowel sign (${i} of ${n})`],
+      chart: ["बाह्रखरी तालिका", "The full barahkhari: each row is a consonant, each column is a vowel sign. Slide sideways to see it all."]
+    },
+    vowels: NE_VOWELS, familyVowels: NE_FAMILY_VOWELS, signs: NE_SIGNS, cons: NE_CONS, extraCons: null,
+    special: [], extraSingles: [],
+    consForm: c => c, consSpeak: c => c, consHow: null,
+    example: l => { const e = NE_EXAMPLES.find(([L]) => L === l); return e && [e[1], e[2], e[3]]; },
+    ui: () => UI.ne
+  }
+};
+const scriptCache = {};
+function scriptLetters(S) {
+  if (scriptCache[S.lang]) return scriptCache[S.lang];
+  const all = [
+    ...S.vowels.map(([l, r]) => ({ l, r, kind: "vowel" })),
+    ...S.special,
+    ...S.cons.map(([c, r]) => ({ l: S.consForm(c), r, kind: "cons", base: c })),
+    ...S.cons.flatMap(([c, cr]) => S.familyVowels.map(([v, vr], i) => i === 0 && S.consForm(c) === c ? null : ({ l: c + S.signs[i], r: cr + vr, kind: "family", base: c, v })).filter(Boolean))
+  ];
+  return (scriptCache[S.lang] = all);
+}
+const heardSets = {};
+const heardSet = S => heardSets[S.lang] || (heardSets[S.lang] = new Set(store.get(S.heardKey, [])));
+function letterSay(S, item, opts) {
+  const heard = heardSet(S);
+  if (scriptLetters(S).includes(item) && !heard.has(item.l)) { heard.add(item.l); store.set(S.heardKey, [...heard]); }
+  const text = item.speak || (item.kind === "cons" ? S.consSpeak(item.base) : item.l);
+  say(text, { lang: S.lang, rate: 0.7, ...opts });
 }
 let seqToken = 0;
-function saySequence(items, onEach, onDone) {
+function saySequence(S, items, onEach, onDone) {
   const token = ++seqToken;
   const step = i => {
     if (token !== seqToken) return;
     if (i >= items.length) { onDone && onDone(); return; }
     onEach(i);
-    taSay(items[i], { onend: () => setTimeout(() => step(i + 1), 180) });
+    letterSay(S, items[i], { onend: () => setTimeout(() => step(i + 1), 180) });
   };
   step(0);
 }
-function taTile(item, extra = "") {
+const both2 = ([native, en]) => `${esc(native)}<small class="en">${esc(en)}</small>`;
+function letterTile(S, item) {
   const b = document.createElement("button");
   b.type = "button";
-  b.className = "ta-tile" + (taHeard.has(item.l) ? " heard" : "") + extra;
+  b.className = "ta-tile" + (heardSet(S).has(item.l) ? " heard" : "");
   b.innerHTML = `<span class="tl">${esc(item.l)}</span><span class="tr">${esc(item.r)}</span>`;
-  b.onclick = () => { taSay(item); b.classList.add("heard", "on"); setTimeout(() => b.classList.remove("on"), 600); showTaCard(item); updateTaMeter(); };
+  b.onclick = () => { letterSay(S, item); b.classList.add("heard", "on"); setTimeout(() => b.classList.remove("on"), 600); showLetterCard(S, item); updateLetterMeter(S); };
   return b;
 }
-function showTaCard(item) {
+function showLetterCard(S, item) {
   const card = $("#taCard", panel);
   if (!card) return;
-  const ex = LETTERS.ta.find(([L]) => L === item.l || L === item.base);
-  const how = item.kind === "uyirmei" ? `${item.base}் + ${item.v} = ${item.l}` : item.kind === "mei" ? `${item.base} + ் = ${item.l}` : "";
+  const ex = item.kind === "family" ? null : S.example(item.base || item.l);
+  const how = item.kind === "family" ? `${S.consForm(item.base)} + ${item.v} = ${item.l}` : item.kind === "cons" && S.consHow ? S.consHow(item.base) : "";
   card.innerHTML = `<div class="big-letter">${esc(item.l)}</div>
     <div><div class="roman">${esc(item.r)}</div>
     ${how ? `<div class="how">${esc(how)}</div>` : ""}
-    ${ex && item.kind !== "uyirmei" ? `<div class="row"><span class="pic" aria-hidden="true">${safePic(ex[2], "")}</span><span class="word">${esc(ex[1])}<small class="gloss">${esc(TA_LETTER_EN[ex[1]] || "")}</small></span></div>` : ""}</div>`;
+    ${ex ? `<div class="row"><span class="pic" aria-hidden="true">${safePic(ex[1], "")}</span><span class="word">${esc(ex[0])}<small class="gloss">${esc(ex[2])}</small></span></div>` : ""}</div>`;
   card.hidden = false;
 }
-function updateTaMeter() {
+function updateLetterMeter(S) {
   const m = $("#taMeter", panel);
   if (!m) return;
-  const n = TA_ALL.filter(x => taHeard.has(x.l)).length;
-  m.innerHTML = `<div class="meter"><i style="width:${(n / TA_ALL.length * 100).toFixed(1)}%"></i></div>
-    <p class="meta">நீ ${n} / ${TA_ALL.length} எழுத்துகளைக் கேட்டிருக்கிறாய்<small class="en">You have heard ${n} of ${TA_ALL.length} letters</small></p>`;
+  const all = scriptLetters(S), heard = heardSet(S);
+  const n = all.filter(x => heard.has(x.l)).length;
+  m.innerHTML = `<div class="meter"><i style="width:${(n / all.length * 100).toFixed(1)}%"></i></div>
+    <p class="meta">${both2(S.heard(n, all.length))}</p>`;
 }
-const TA_MODES = [["உயிர்", "Vowels · 12"], ["மெய்", "Consonants · 18"], ["உயிர்மெய்", "Letter families · 216"], ["அட்டவணை", "Full chart · 247"], ["கிரந்தம்", "Extra letters"], ["விளையாட்டு", "Letter game"]];
-function viewTamilLetters() {
-  const mode = store.get("taMode", 0);
-  if (!view || view.kind !== "ta" || view.mode !== mode) view = { kind: "ta", mode, row: store.get("taRow", 0), round: 0, rounds: 10 };
+function viewScriptLetters(S) {
+  const mode = Math.min(S.modes.length - 1, store.get(S.lang + "Mode", 0));
+  if (!view || view.kind !== "letters" || view.mode !== mode || view.lang !== S.lang) view = { kind: "letters", lang: S.lang, mode, row: store.get(S.lang + "Row", 0), round: 0, rounds: 10 };
   seqToken++;
-  panel.innerHTML = `<h2>தமிழ் எழுத்துகள்<small class="en">Tamil letters: 12 vowels + 18 consonants + 216 letter families + ஃ = 247</small></h2>
-    <p class="hint">ஒரு எழுத்தைத் தொட்டுக் கேள்.<small class="en">Tap a letter to hear it. The English letters under each one show how to say it.</small></p>`;
+  panel.innerHTML = `<h2>${both2(S.title)}</h2><p class="hint">${both2(S.hint)}</p>`;
   const chips = document.createElement("div");
   chips.className = "chips";
-  TA_MODES.forEach(([ta, en], i) => {
+  S.modes.forEach(([native, en], i) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.innerHTML = `${esc(ta)}<small class="en">${esc(en)}</small>`;
+    b.innerHTML = `${esc(native)}<small class="en">${esc(en)}</small>`;
     b.setAttribute("aria-pressed", i === mode);
-    b.onclick = () => { store.set("taMode", i); view = null; Speech.stop(); viewTamilLetters(); };
+    b.onclick = () => { store.set(S.lang + "Mode", i); view = null; Speech.stop(); viewScriptLetters(S); };
     chips.appendChild(b);
   });
   panel.appendChild(chips);
   panel.insertAdjacentHTML("beforeend", `<div id="taMeter"></div><div class="letter-card" id="taCard" hidden></div>`);
-  updateTaMeter();
+  updateLetterMeter(S);
   const body = document.createElement("div");
   panel.appendChild(body);
-  [taVowels, taConsonants, taFamilies, taChart, taGrantha, taGame][mode](body);
+  const screens = S.extraCons
+    ? [lettersVowels, lettersCons, lettersFamilies, lettersChart, lettersExtra, lettersGame]
+    : [lettersVowels, lettersCons, lettersFamilies, lettersChart, lettersGame];
+  screens[mode](S, body);
 }
-function taGrid(body, items, cls = "") {
+function letterGrid(S, body, items, cls = "") {
   const g = document.createElement("div");
   g.className = "ta-grid " + cls;
-  items.forEach(it => g.appendChild(taTile(it)));
+  items.forEach(it => g.appendChild(letterTile(S, it)));
   body.appendChild(g);
   return g;
 }
-function taVowels(body) {
-  body.insertAdjacentHTML("beforeend", `<p class="section-title">உயிர் எழுத்துகள்<small class="en">Vowels: say them by themselves</small></p>`);
-  taGrid(body, TA_ALL.filter(x => x.kind === "uyir" || x.kind === "aytham"));
-  readAllButton(body, TA_ALL.filter(x => x.kind === "uyir"));
+function lettersVowels(S, body) {
+  body.insertAdjacentHTML("beforeend", `<p class="section-title">${both2(S.sections.vowels)}</p>`);
+  const all = scriptLetters(S);
+  letterGrid(S, body, all.filter(x => x.kind === "vowel" || x.kind === "special"));
+  readAllButton(S, body, all.filter(x => x.kind === "vowel"));
 }
-function taConsonants(body) {
-  body.insertAdjacentHTML("beforeend", `<p class="section-title">மெய் எழுத்துகள்<small class="en">Consonants: the dot on top (்) means "no vowel". We say க் as "ik".</small></p>`);
-  taGrid(body, TA_ALL.filter(x => x.kind === "mei"));
-  readAllButton(body, TA_ALL.filter(x => x.kind === "mei"));
+function lettersCons(S, body) {
+  body.insertAdjacentHTML("beforeend", `<p class="section-title">${both2(S.sections.cons)}</p>`);
+  const cons = scriptLetters(S).filter(x => x.kind === "cons");
+  letterGrid(S, body, cons);
+  readAllButton(S, body, cons);
 }
-function readAllButton(body, items) {
+function readAllButton(S, body, items) {
   const box = document.createElement("div");
   box.className = "btns";
   box.style.marginTop = "14px";
-  box.innerHTML = `<button class="btn" type="button">🔊 எல்லாவற்றையும் படி<small class="en">Read them all</small></button>`;
+  box.innerHTML = `<button class="btn" type="button">🔊 ${both2(S.readAll)}</button>`;
   box.firstElementChild.onclick = () => {
     const tiles = [...body.querySelectorAll(".ta-tile")];
-    saySequence(items, i => { tiles.forEach(t => t.classList.remove("on")); const tile = tiles.find(t => $(".tl", t).textContent === items[i].l); tile && tile.classList.add("on", "heard"); showTaCard(items[i]); updateTaMeter(); },
+    saySequence(S, items, i => { tiles.forEach(t => t.classList.remove("on")); const tile = tiles.find(t => $(".tl", t).textContent === items[i].l); tile && tile.classList.add("on", "heard"); showLetterCard(S, items[i]); updateLetterMeter(S); },
       () => tiles.forEach(t => t.classList.remove("on")));
   };
   body.appendChild(box);
 }
-function taFamilies(body) {
-  const row = Math.min(TA_CONS.length - 1, view.row);
-  const [c, cr] = TA_CONS[row];
-  const pick = document.createElement("div");
-  pick.className = "chips cons-pick";
-  TA_CONS.forEach(([cc], i) => {
+function lettersFamilies(S, body) {
+  const row = Math.min(S.cons.length - 1, view.row);
+  const [c, cr] = S.cons[row];
+  const pickRow = document.createElement("div");
+  pickRow.className = "chips cons-pick";
+  S.cons.forEach(([cc], i) => {
     const b = document.createElement("button");
     b.type = "button"; b.textContent = cc;
     b.setAttribute("aria-pressed", i === row);
-    b.onclick = () => { view.row = i; store.set("taRow", i); seqToken++; body.innerHTML = ""; taFamilies(body); };
-    pick.appendChild(b);
+    b.onclick = () => { view.row = i; store.set(S.lang + "Row", i); seqToken++; body.innerHTML = ""; lettersFamilies(S, body); };
+    pickRow.appendChild(b);
   });
-  body.appendChild(pick);
-  body.insertAdjacentHTML("beforeend", `<p class="section-title">${esc(c)}் + உயிர் = ${esc(c)} வரிசை<small class="en">The ${esc(cr)} family: ${esc(c)}் joined with each vowel (${row + 1} of 18)</small></p>`);
-  const items = TA_ALL.filter(x => x.kind === "uyirmei" && x.base === c);
-  taGrid(body, items, "family");
+  body.appendChild(pickRow);
+  body.insertAdjacentHTML("beforeend", `<p class="section-title">${both2(S.sections.family(c, cr, row + 1, S.cons.length))}</p>`);
+  const items = familyRow(S, c);
+  letterGrid(S, body, items, "family");
   const nav = document.createElement("div");
   nav.className = "btns";
   nav.style.marginTop = "14px";
-  nav.innerHTML = `<button class="btn alt" type="button" data-d="-1"${row ? "" : " disabled"}>◀</button>
-    <button class="btn" type="button" data-read>🔊 வரிசையைப் படி<small class="en">Read the row</small></button>
-    <button class="btn go" type="button" data-d="1"${row < TA_CONS.length - 1 ? "" : " disabled"}>▶</button>`;
-  nav.querySelectorAll("[data-d]").forEach(b => b.onclick = () => { view.row = row + +b.dataset.d; store.set("taRow", view.row); seqToken++; body.innerHTML = ""; taFamilies(body); });
+  nav.innerHTML = `<button class="btn alt" type="button" data-d="-1"${row ? "" : " disabled"} aria-label="Previous">◀</button>
+    <button class="btn" type="button" data-read>🔊 ${both2(S.readRow)}</button>
+    <button class="btn go" type="button" data-d="1"${row < S.cons.length - 1 ? "" : " disabled"} aria-label="Next">▶</button>`;
+  nav.querySelectorAll("[data-d]").forEach(b => b.onclick = () => { view.row = row + +b.dataset.d; store.set(S.lang + "Row", view.row); seqToken++; body.innerHTML = ""; lettersFamilies(S, body); });
   $("[data-read]", nav).onclick = () => {
     const tiles = [...body.querySelectorAll(".ta-grid .ta-tile")];
-    saySequence(items, i => { tiles.forEach(t => t.classList.remove("on")); tiles[i].classList.add("on", "heard"); showTaCard(items[i]); updateTaMeter(); },
+    saySequence(S, items, i => { tiles.forEach(t => t.classList.remove("on")); tiles[i].classList.add("on", "heard"); showLetterCard(S, items[i]); updateLetterMeter(S); },
       () => tiles.forEach(t => t.classList.remove("on")));
   };
   body.appendChild(nav);
 }
-function taTable(body, cons) {
+// The row for one consonant. In Nepali the first form is the consonant itself (क).
+function familyRow(S, c) {
+  const all = scriptLetters(S);
+  return S.familyVowels.map(([v, vr], i) => {
+    if (i === 0 && S.consForm(c) === c) return all.find(x => x.kind === "cons" && x.base === c);
+    return all.find(x => x.kind === "family" && x.base === c && x.v === v)
+      || { l: c + S.signs[i], r: (S.cons.concat(S.extraCons || []).find(([k]) => k === c) || ["", ""])[1] + vr, kind: "extra", base: c, v };
+  });
+}
+function letterTable(S, body, cons) {
   const wrap = document.createElement("div");
   wrap.className = "chart-wrap";
   const table = document.createElement("table");
   table.className = "ta-chart";
   const head = document.createElement("tr");
-  head.innerHTML = `<th></th>` + TA_VOWELS.map(([v, r]) => `<th><span class="tl">${v}</span><span class="tr">${r}</span></th>`).join("");
+  head.innerHTML = `<th></th>` + S.familyVowels.map(([v, r]) => `<th><span class="tl">${v}</span><span class="tr">${r}</span></th>`).join("");
   table.appendChild(head);
   cons.forEach(([c, cr]) => {
     const tr = document.createElement("tr");
     const th = document.createElement("th");
-    th.innerHTML = `<span class="tl">${c}்</span><span class="tr">${cr}</span>`;
+    th.innerHTML = `<span class="tl">${S.consForm(c)}</span><span class="tr">${cr}</span>`;
     tr.appendChild(th);
-    TA_VOWELS.forEach(([v, vr], i) => {
-      const item = TA_ALL.find(x => x.kind === "uyirmei" && x.base === c && x.v === v) || { l: c + TA_SIGNS[i], r: cr + vr, kind: "grantha", base: c, v };
+    familyRow(S, c).forEach(item => {
       const td = document.createElement("td");
-      td.appendChild(taTile(item));
+      td.appendChild(letterTile(S, item));
       tr.appendChild(td);
     });
     table.appendChild(tr);
@@ -1365,34 +1635,37 @@ function taTable(body, cons) {
   wrap.appendChild(table);
   body.appendChild(wrap);
 }
-function taChart(body) {
-  body.insertAdjacentHTML("beforeend", `<p class="section-title">உயிர்மெய் அட்டவணை<small class="en">The full chart: each row is a consonant, each column is a vowel. Slide sideways to see it all.</small></p>`);
-  taTable(body, TA_CONS);
+function lettersChart(S, body) {
+  body.insertAdjacentHTML("beforeend", `<p class="section-title">${both2(S.sections.chart)}</p>`);
+  letterTable(S, body, S.cons);
 }
-function taGrantha(body) {
-  body.insertAdjacentHTML("beforeend", `<p class="section-title">கிரந்த எழுத்துகள்<small class="en">Extra letters used in words from other languages, like ஜன்னல் (window) and ஹெலிகாப்டர் (helicopter)</small></p>`);
-  taTable(body, TA_GRANTHA);
-  taGrid(body, [{ l: "ஸ்ரீ", r: "shrii", kind: "grantha" }]);
+function lettersExtra(S, body) {
+  body.insertAdjacentHTML("beforeend", `<p class="section-title">${both2(S.sections.extra)}</p>`);
+  letterTable(S, body, S.extraCons);
+  if (S.extraSingles.length) letterGrid(S, body, S.extraSingles);
 }
-function taGame(body) {
+function lettersGame(S, body) {
+  const U = S.ui();
   if (view.round >= view.rounds) {
-    body.innerHTML = `<div class="celebrate">🏆 ${esc(UI.ta.done(nm()))}<small class="en">${esc(UI.en.done(CHILD))}</small></div>
-      <div class="btns"><button class="btn" type="button">${esc(UI.ta.again)}<small class="en">${esc(UI.en.again)}</small></button></div>`;
-    $("button", body).onclick = () => { view = null; viewTamilLetters(); };
+    body.innerHTML = `<div class="celebrate">🏆 ${esc(U.done(nm()))}<small class="en">${esc(UI.en.done(CHILD))}</small></div>
+      <div class="btns"><button class="btn" type="button">${esc(U.again)}<small class="en">${esc(UI.en.again)}</small></button></div>`;
+    $("button", body).onclick = () => { view = null; viewScriptLetters(S); };
     confetti();
     return;
   }
+  const all = scriptLetters(S);
   if (!view.cur) {
-    const target = draw("taLetter", TA_ALL);
-    const same = TA_ALL.filter(x => x !== target && (x.base === target.base || x.v === target.v || x.kind === target.kind));
+    const target = draw(S.lang + "Letter", all);
+    const same = all.filter(x => x !== target && (x.base === target.base || x.v === target.v || x.kind === target.kind));
     view.cur = { target, options: shuffle([target, ...shuffle(same).slice(0, 3)]) };
-    setTimeout(() => taSay(target), 250);
+    const v0 = view;
+    setTimeout(() => { if (view === v0) letterSay(S, target); }, 250);
   }
   const { target, options } = view.cur;
-  body.innerHTML = `<p class="hint">எந்த எழுத்தைக் கேட்டாய்?<small class="en">Which letter did you hear?</small></p>${progressDots()}
+  body.innerHTML = `<p class="hint">${both2(S.which)}</p>${progressDots()}
     <button class="big-ear" type="button" aria-label="Hear it again">👂🔊</button>
     <div class="choices"></div><div class="feedback"></div>`;
-  $(".big-ear", body).onclick = () => taSay(target);
+  $(".big-ear", body).onclick = () => letterSay(S, target);
   const box = $(".choices", body), fb = $(".feedback", body);
   box.style.gridTemplateColumns = "repeat(2, 1fr)";
   let locked = false;
@@ -1406,14 +1679,14 @@ function taGame(body) {
         locked = true;
         b.classList.add("right");
         b.insertAdjacentHTML("beforeend", `<span class="tr">${esc(o.r)}</span>`);
-        fb.className = "feedback good"; fb.innerHTML = "⭐ " + esc(pick(UI.ta.good(nm())));
+        fb.className = "feedback good"; fb.innerHTML = "⭐ " + esc(pick(U.good(nm())));
         addStar();
         const v0 = view;
-        setTimeout(() => { if (view !== v0) return; view.round++; view.cur = null; body.innerHTML = ""; taGame(body); }, 1600);
+        setTimeout(() => { if (view !== v0) return; view.round++; view.cur = null; body.innerHTML = ""; lettersGame(S, body); }, 1600);
       } else {
         b.classList.remove("wrong"); void b.offsetWidth; b.classList.add("wrong");
-        fb.className = "feedback bad"; fb.innerHTML = esc(UI.ta.bad) + `<small class="en">${esc(UI.en.bad)}</small>`;
-        taSay(target);
+        fb.className = "feedback bad"; fb.innerHTML = esc(U.bad) + `<small class="en">${esc(UI.en.bad)}</small>`;
+        letterSay(S, target);
       }
     };
     box.appendChild(b);
@@ -1422,49 +1695,49 @@ function taGame(body) {
 
 /* ---------------------------------------------------------------- math */
 const MATH_TOPICS = [
-  { id: "count", g: 1, icon: "🔢", n: ["Count", "Compter", "எண்ணுதல்"] },
-  { id: "add10", g: 1, icon: "➕", n: ["Add to 10", "Additions jusqu'à 10", "10 வரை கூட்டல்"] },
-  { id: "sub10", g: 1, icon: "➖", n: ["Take away to 10", "Soustractions jusqu'à 10", "10 வரை கழித்தல்"] },
-  { id: "add20", g: 1, icon: "➕", n: ["Add to 20", "Additions jusqu'à 20", "20 வரை கூட்டல்"] },
-  { id: "sub20", g: 1, icon: "➖", n: ["Take away to 20", "Soustractions jusqu'à 20", "20 வரை கழித்தல்"] },
-  { id: "compare", g: 1, icon: "⚖️", n: ["Bigger number", "Le plus grand", "பெரிய எண்"] },
-  { id: "next", g: 1, icon: "⏭️", n: ["What comes next", "Et après ?", "அடுத்த எண்"] },
-  { id: "shapes", g: 1, icon: "🔺", n: ["Shapes", "Les formes", "வடிவங்கள்"] },
-  { id: "add100", g: 2, icon: "➕", n: ["Add to 100", "Additions jusqu'à 100", "100 வரை கூட்டல்"] },
-  { id: "sub100", g: 2, icon: "➖", n: ["Take away to 100", "Soustractions jusqu'à 100", "100 வரை கழித்தல்"] },
-  { id: "place", g: 2, icon: "🧱", n: ["Tens and ones", "Dizaines et unités", "பத்துகளும் ஒன்றுகளும்"] },
-  { id: "missing", g: 2, icon: "❓", n: ["Missing number", "Nombre manquant", "விடுபட்ட எண்"] },
-  { id: "skip", g: 2, icon: "🐸", n: ["Skip counting", "Compter par bonds", "தாவி எண்ணுதல்"] },
-  { id: "evenodd", g: 2, icon: "👯", n: ["Even or odd", "Pair ou impair", "இரட்டை / ஒற்றை"] },
-  { id: "time", g: 2, icon: "🕒", n: ["Tell the time", "Lire l'heure", "நேரம் பார்"] }
+  { id: "count", g: 1, icon: "🔢", n: ["Count", "Compter", "எண்ணுதல்", "गन्ती"] },
+  { id: "add10", g: 1, icon: "➕", n: ["Add to 10", "Additions jusqu'à 10", "10 வரை கூட்டல்", "१० सम्म जोड"] },
+  { id: "sub10", g: 1, icon: "➖", n: ["Take away to 10", "Soustractions jusqu'à 10", "10 வரை கழித்தல்", "१० सम्म घटाउ"] },
+  { id: "add20", g: 1, icon: "➕", n: ["Add to 20", "Additions jusqu'à 20", "20 வரை கூட்டல்", "२० सम्म जोड"] },
+  { id: "sub20", g: 1, icon: "➖", n: ["Take away to 20", "Soustractions jusqu'à 20", "20 வரை கழித்தல்", "२० सम्म घटाउ"] },
+  { id: "compare", g: 1, icon: "⚖️", n: ["Bigger number", "Le plus grand", "பெரிய எண்", "ठूलो अङ्क"] },
+  { id: "next", g: 1, icon: "⏭️", n: ["What comes next", "Et après ?", "அடுத்த எண்", "अर्को अङ्क"] },
+  { id: "shapes", g: 1, icon: "🔺", n: ["Shapes", "Les formes", "வடிவங்கள்", "आकारहरू"] },
+  { id: "add100", g: 2, icon: "➕", n: ["Add to 100", "Additions jusqu'à 100", "100 வரை கூட்டல்", "१०० सम्म जोड"] },
+  { id: "sub100", g: 2, icon: "➖", n: ["Take away to 100", "Soustractions jusqu'à 100", "100 வரை கழித்தல்", "१०० सम्म घटाउ"] },
+  { id: "place", g: 2, icon: "🧱", n: ["Tens and ones", "Dizaines et unités", "பத்துகளும் ஒன்றுகளும்", "दशक र एकाइ"] },
+  { id: "missing", g: 2, icon: "❓", n: ["Missing number", "Nombre manquant", "விடுபட்ட எண்", "छुटेको अङ्क"] },
+  { id: "skip", g: 2, icon: "🐸", n: ["Skip counting", "Compter par bonds", "தாவி எண்ணுதல்", "उफ्रेर गन्ती"] },
+  { id: "evenodd", g: 2, icon: "👯", n: ["Even or odd", "Pair ou impair", "இரட்டை / ஒற்றை", "जोर वा बिजोर"] },
+  { id: "time", g: 2, icon: "🕒", n: ["Tell the time", "Lire l'heure", "நேரம் பார்", "समय हेर"] }
 ];
-const LI = { en: 0, fr: 1, ta: 2 };
+const LI = { en: 0, fr: 1, ta: 2, ne: 3 };
 const MQ = {
-  howMany: ["How many?", "Combien ?", "எத்தனை?"],
-  solve: ["What is the answer?", "Quelle est la réponse ?", "விடை என்ன?"],
-  bigger: ["Which number is bigger?", "Quel nombre est le plus grand ?", "எந்த எண் பெரியது?"],
-  after: [n => `What comes after ${n}?`, n => `Quel nombre vient après ${n} ?`, n => `${n}க்கு அடுத்த எண் எது?`],
-  shape: [s => `Which one is the ${s}?`, s => `Trouve la forme : ${s}`, s => `${s} எது?`],
-  place: ["What number is this?", "Quel est ce nombre ?", "இது என்ன எண்?"],
-  missing: ["Find the missing number.", "Trouve le nombre qui manque.", "விடுபட்ட எண்ணைக் கண்டுபிடி."],
-  skip: ["What comes next?", "Quel nombre vient ensuite ?", "அடுத்து என்ன வரும்?"],
-  evenOdd: [n => `Is ${n} even or odd?`, n => `${n} est-il pair ou impair ?`, n => `${n} இரட்டை எண்ணா, ஒற்றை எண்ணா?`],
-  time: ["What time is it?", "Quelle heure est-il ?", "மணி என்ன?"],
-  even: ["even", "pair", "இரட்டை"], odd: ["odd", "impair", "ஒற்றை"],
-  plus: ["plus", "plus", "கூட்டல்"], minus: ["minus", "moins", "கழித்தல்"],
-  tens: ["tens", "dizaines", "பத்துகள்"], ones: ["ones", "unités", "ஒன்றுகள்"]
+  howMany: ["How many?", "Combien ?", "எத்தனை?", "कति वटा?"],
+  solve: ["What is the answer?", "Quelle est la réponse ?", "விடை என்ன?", "उत्तर के हो?"],
+  bigger: ["Which number is bigger?", "Quel nombre est le plus grand ?", "எந்த எண் பெரியது?", "कुन अङ्क ठूलो हो?"],
+  after: [n => `What comes after ${n}?`, n => `Quel nombre vient après ${n} ?`, n => `${n}க்கு அடுத்த எண் எது?`, n => `${n} पछि कुन अङ्क आउँछ?`],
+  shape: [s => `Which one is the ${s}?`, s => `Trouve la forme : ${s}`, s => `${s} எது?`, s => `${s} कुन हो?`],
+  place: ["What number is this?", "Quel est ce nombre ?", "இது என்ன எண்?", "यो कुन अङ्क हो?"],
+  missing: ["Find the missing number.", "Trouve le nombre qui manque.", "விடுபட்ட எண்ணைக் கண்டுபிடி.", "छुटेको अङ्क खोज।"],
+  skip: ["What comes next?", "Quel nombre vient ensuite ?", "அடுத்து என்ன வரும்?", "अब के आउँछ?"],
+  evenOdd: [n => `Is ${n} even or odd?`, n => `${n} est-il pair ou impair ?`, n => `${n} இரட்டை எண்ணா, ஒற்றை எண்ணா?`, n => `${n} जोर हो कि बिजोर?`],
+  time: ["What time is it?", "Quelle heure est-il ?", "மணி என்ன?", "कति बज्यो?"],
+  even: ["even", "pair", "இரட்டை", "जोर"], odd: ["odd", "impair", "ஒற்றை", "बिजोर"],
+  plus: ["plus", "plus", "கூட்டல்", "जोड"], minus: ["minus", "moins", "கழித்தல்", "घटाउ"],
+  tens: ["tens", "dizaines", "பத்துகள்", "दशक"], ones: ["ones", "unités", "ஒன்றுகள்", "एकाइ"]
 };
 const mq = (key, ...a) => { const v = MQ[key][LI[lang]]; return typeof v === "function" ? v(...a) : v; };
 const mqEn = (key, ...a) => { const v = MQ[key][0]; return typeof v === "function" ? v(...a) : v; };
 const SHAPES = {
-  circle: { n: ["circle", "cercle", "வட்டம்"], svg: `<circle cx="50" cy="50" r="38" fill="#e84a7f"/>` },
-  square: { n: ["square", "carré", "சதுரம்"], svg: `<rect x="14" y="14" width="72" height="72" rx="4" fill="#2f8fd8"/>` },
-  triangle: { n: ["triangle", "triangle", "முக்கோணம்"], svg: `<polygon points="50,10 90,86 10,86" fill="#3fa66b"/>` },
-  rectangle: { n: ["rectangle", "rectangle", "செவ்வகம்"], svg: `<rect x="6" y="28" width="88" height="44" rx="4" fill="#f28a2e"/>` },
-  star: { n: ["star", "étoile", "நட்சத்திரம்"], svg: `<polygon points="50,6 61,38 95,38 67,58 78,92 50,71 22,92 33,58 5,38 39,38" fill="#e0a800"/>` },
-  heart: { n: ["heart", "cœur", "இதயம்"], svg: `<path d="M50 88 C20 66 6 48 16 30 C26 12 46 16 50 32 C54 16 74 12 84 30 C94 48 80 66 50 88 Z" fill="#d92d4f"/>` },
-  oval: { n: ["oval", "ovale", "நீள்வட்டம்"], svg: `<ellipse cx="50" cy="50" rx="44" ry="28" fill="#8a5cc7"/>` },
-  diamond: { n: ["diamond", "losange", "சாய்சதுரம்"], svg: `<polygon points="50,6 88,50 50,94 12,50" fill="#0f8f84"/>` }
+  circle: { n: ["circle", "cercle", "வட்டம்", "गोलो"], svg: `<circle cx="50" cy="50" r="38" fill="#e84a7f"/>` },
+  square: { n: ["square", "carré", "சதுரம்", "वर्ग"], svg: `<rect x="14" y="14" width="72" height="72" rx="4" fill="#2f8fd8"/>` },
+  triangle: { n: ["triangle", "triangle", "முக்கோணம்", "त्रिभुज"], svg: `<polygon points="50,10 90,86 10,86" fill="#3fa66b"/>` },
+  rectangle: { n: ["rectangle", "rectangle", "செவ்வகம்", "आयत"], svg: `<rect x="6" y="28" width="88" height="44" rx="4" fill="#f28a2e"/>` },
+  star: { n: ["star", "étoile", "நட்சத்திரம்", "तारा"], svg: `<polygon points="50,6 61,38 95,38 67,58 78,92 50,71 22,92 33,58 5,38 39,38" fill="#e0a800"/>` },
+  heart: { n: ["heart", "cœur", "இதயம்", "मुटु"], svg: `<path d="M50 88 C20 66 6 48 16 30 C26 12 46 16 50 32 C54 16 74 12 84 30 C94 48 80 66 50 88 Z" fill="#d92d4f"/>` },
+  oval: { n: ["oval", "ovale", "நீள்வட்டம்", "अण्डाकार"], svg: `<ellipse cx="50" cy="50" rx="44" ry="28" fill="#8a5cc7"/>` },
+  diamond: { n: ["diamond", "losange", "சாய்சதுரம்", "हीरा आकार"], svg: `<polygon points="50,6 88,50 50,94 12,50" fill="#0f8f84"/>` }
 };
 const shapeSvg = id => `<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">${SHAPES[id].svg}</svg>`;
 const rand = (a, b) => a + (Math.random() * (b - a + 1) | 0);
@@ -1496,6 +1769,7 @@ function clockSvg(h, m) {
 function timeWords(h, m, l) {
   if (l === "en") return m ? `half past ${numWord(h, "en")}` : `${numWord(h, "en")} o'clock`;
   if (l === "fr") return (h === 1 ? "une heure" : `${numWord(h, "fr")} heures`) + (m ? " et demie" : "");
+  if (l === "ne") return m ? (h === 1 ? "डेढ बजे" : h === 2 ? "अढाई बजे" : `साढे ${NE_NUMS[h]} बजे`) : `${NE_NUMS[h]} बजे`;
   const w = numWord(h, "ta");
   return m ? w.replace(/ு$/, "") + "ரை மணி" : w + " மணி";
 }
@@ -1513,7 +1787,7 @@ function makeMathQuestion(id) {
     }
     case "add10": case "add20": {
       const max = id === "add10" ? 10 : 20;
-      const a = rand(id === "add10" ? 0 : 2, max - 1), b = rand(1, max - a);
+      const a = rand(id === "add10" ? 1 : 2, max - 1), b = rand(1, max - a);
       const vis = a + b <= 20 ? `<div class="objects${a + b > 10 ? " small" : ""}">${objectGroup(a, e)}<b class="op">+</b>${objectGroup(b, e)}</div>` : "";
       return { ask: ["solve"], show: eq(a, "+", b, "?") + vis, answer: a + b, options: nearOptions(a + b, 3, 0, max), speak: say2(a, "+", b) };
     }
@@ -1596,7 +1870,7 @@ function viewMath() {
       b.type = "button";
       b.innerHTML = `${x.icon} ${esc(x.n[LI[lang]])}${enUnder(x.n[0])}`;
       b.setAttribute("aria-pressed", x.id === topic);
-      b.onclick = () => { store.set("mathTopic", x.id); view = null; Speech.stop(); viewMath(); };
+      b.onclick = () => { store.set("mathTopic", x.id); view = null; Speech.stop(); viewMath(); scrollToActivity(".math-body"); };
       chips.appendChild(b);
     });
     panel.appendChild(chips);
@@ -1655,26 +1929,26 @@ function viewMath() {
 
 /* ---------------------------------------------------------------- colors and numbers */
 const COLOR_LIST = [
-  { hex: "#e53935", en: "red", fr: "rouge", ta: "சிவப்பு", e: "🍎" },
-  { hex: "#1e88e5", en: "blue", fr: "bleu", ta: "நீலம்", e: "🐳" },
-  { hex: "#43a047", en: "green", fr: "vert", ta: "பச்சை", e: "🐸" },
-  { hex: "#fdd835", en: "yellow", fr: "jaune", ta: "மஞ்சள்", e: "🍌" },
-  { hex: "#fb8c00", en: "orange", fr: "orange", ta: "ஆரஞ்சு", e: "🍊" },
-  { hex: "#8e24aa", en: "purple", fr: "violet", ta: "ஊதா", e: "🍇" },
-  { hex: "#ec407a", en: "pink", fr: "rose", ta: "இளஞ்சிவப்பு", e: "🌸" },
-  { hex: "#795548", en: "brown", fr: "marron", ta: "பழுப்பு", e: "🐻" },
-  { hex: "#212121", en: "black", fr: "noir", ta: "கருப்பு", e: "🎱" },
-  { hex: "#ffffff", en: "white", fr: "blanc", ta: "வெள்ளை", e: "🥛" },
-  { hex: "#9e9e9e", en: "gray", fr: "gris", ta: "சாம்பல்", e: "🐘" },
-  { hex: "#d4af37", en: "gold", fr: "doré", ta: "தங்கம்", e: "👑" },
-  { hex: "#c0c0c0", en: "silver", fr: "argenté", ta: "வெள்ளி", e: "🥄" }
+  { hex: "#e53935", en: "red", fr: "rouge", ta: "சிவப்பு", ne: "रातो", e: "🍎" },
+  { hex: "#1e88e5", en: "blue", fr: "bleu", ta: "நீலம்", ne: "निलो", e: "🐳" },
+  { hex: "#43a047", en: "green", fr: "vert", ta: "பச்சை", ne: "हरियो", e: "🐸" },
+  { hex: "#fdd835", en: "yellow", fr: "jaune", ta: "மஞ்சள்", ne: "पहेँलो", e: "🍌" },
+  { hex: "#fb8c00", en: "orange", fr: "orange", ta: "ஆரஞ்சு", ne: "सुन्तले", e: "🍊" },
+  { hex: "#8e24aa", en: "purple", fr: "violet", ta: "ஊதா", ne: "बैजनी", e: "🍇" },
+  { hex: "#ec407a", en: "pink", fr: "rose", ta: "இளஞ்சிவப்பு", ne: "गुलाबी", e: "🌸" },
+  { hex: "#795548", en: "brown", fr: "marron", ta: "பழுப்பு", ne: "खैरो", e: "🐻" },
+  { hex: "#212121", en: "black", fr: "noir", ta: "கருப்பு", ne: "कालो", e: "🎱" },
+  { hex: "#ffffff", en: "white", fr: "blanc", ta: "வெள்ளை", ne: "सेतो", e: "🥛" },
+  { hex: "#9e9e9e", en: "gray", fr: "gris", ta: "சாம்பல்", ne: "खरानी", e: "🐘" },
+  { hex: "#d4af37", en: "gold", fr: "doré", ta: "தங்கம்", ne: "सुनौलो", e: "👑" },
+  { hex: "#c0c0c0", en: "silver", fr: "argenté", ta: "வெள்ளி", ne: "चाँदी", e: "🥄" }
 ];
 function numberTile(n, big) {
   const b = document.createElement("button");
   b.type = "button";
   b.className = big ? "num-tile" : "num-cell";
   b.innerHTML = big
-    ? `<span class="digit">${n}</span>${lang === "ta" ? `<span class="tadigit">${taDigits(n)}</span>` : ""}<span class="nw">${esc(numWord(n))}</span>${enUnder(numWord(n, "en"))}`
+    ? `<span class="digit">${n}</span>${homeDigits(n) ? `<span class="tadigit">${homeDigits(n)}</span>` : ""}<span class="nw">${esc(numWord(n))}</span>${enUnder(numWord(n, "en"))}`
     : `${n}`;
   return b;
 }
@@ -1716,7 +1990,7 @@ function viewColorsNumbers() {
     body.innerHTML = `<p class="hint">${tt("tapHear")}</p><div class="num-banner" id="numBanner"></div><div class="hundred"></div>`;
     const banner = $("#numBanner", body);
     const showN = n => {
-      banner.innerHTML = `<span class="digit">${n}</span>${lang === "ta" ? `<span class="tadigit">${taDigits(n)}</span>` : ""}<span class="nw">${esc(numWord(n))}</span>${enUnder(numWord(n, "en"))}`;
+      banner.innerHTML = `<span class="digit">${n}</span>${homeDigits(n) ? `<span class="tadigit">${homeDigits(n)}</span>` : ""}<span class="nw">${esc(numWord(n))}</span>${enUnder(numWord(n, "en"))}`;
     };
     showN(view.sel || 1);
     for (let n = 1; n <= 100; n++) {
@@ -1785,6 +2059,12 @@ function cnGame(body, kind) {
   });
 }
 
+// After choosing a topic, bring the activity on screen if it starts below the fold.
+function scrollToActivity(sel) {
+  const el = $(sel, panel);
+  if (el && el.getBoundingClientRect().top > innerHeight * .6) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 /* ---------------------------------------------------------------- confetti */
 function confetti() {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -1804,7 +2084,7 @@ function confetti() {
 }
 
 /* ---------------------------------------------------------------- boot */
-const VIEWS = [() => lang === "ta" ? viewTamilLetters() : viewLetters(), viewWords, viewRead, viewPlay, viewBooks, viewMath, viewColorsNumbers,
+const VIEWS = [() => SCRIPTS[lang] ? viewScriptLetters(SCRIPTS[lang]) : viewLetters(), viewWords, viewRead, viewPlay, viewBooks, viewMath, viewColorsNumbers,
   () => window.AharaWorld.render(), () => window.AharaChess.render()];
 // Shared helpers for the sections that live in their own files (world.js, chess.js).
 window.Ahara = {
@@ -1812,6 +2092,7 @@ window.Ahara = {
   stop: () => Speech.stop(), CHILD, isTab: i => tab === i
 };
 function render() { renderChrome(); VIEWS[tab](); }
+drawLangButtons();
 document.querySelectorAll(".lang button").forEach(b => b.onclick = () => {
   lang = b.dataset.lang;
   store.set("lang", lang);
@@ -1849,7 +2130,7 @@ window.AharaUpdate = (() => {
     event(type, pct) {
       if (type === "progress") show(`<p>⬇ Downloading the update… ${pct}%</p><div class="meter"><i style="width:${pct}%"></i></div>`);
       else if (type === "installing") { show(`<p>✅ Downloaded. Tap <b>Install</b> (or <b>Update</b>) on the next screen.</p>${buttons(false)}`); wire(); }
-      else if (type === "permission") { show(`<p>🔒 Android needs your OK first: turn on <b>Allow from this source</b> for Ahara, come back, then tap <b>Update now</b> again.</p>${buttons(true, "Update now")}`); wire(); }
+      else if (type === "permission") { show(`<p>🔒 Android needs your OK first: turn on <b>Allow from this source</b> for ${esc(CHILD)}, come back, then tap <b>Update now</b> again.</p>${buttons(true, "Update now")}`); wire(); }
       else if (type === "failed") { show(`<p>😕 The update could not download here. You can get it from the download page instead.</p><div class="btns"><button type="button" class="btn go" data-page>Open download page</button><button type="button" class="btn alt" data-later>Later</button></div>`); wire(); }
     }
   };
